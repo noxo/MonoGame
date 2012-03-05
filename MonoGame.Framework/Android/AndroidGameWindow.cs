@@ -43,11 +43,13 @@ using System;
 using System.Drawing;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using Android.Content;
 using Android.Content.PM;
 using Android.Content.Res;
 using Android.Util;
 using Android.Views;
+using Android.Runtime;
 using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using OpenTK.Platform.Android;
@@ -57,6 +59,7 @@ using OpenTK.Platform;
 using OpenTK.Graphics;
 //using OpenTK.Graphics.ES11;
 //using OpenTK.Graphics.ES20;
+using Javax.Microedition.Khronos.Egl;
 
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Input.Touch;
@@ -80,7 +83,13 @@ namespace Microsoft.Xna.Framework
         double renderFrameTotal;
         double updateFrameLast;
         double renderFrameLast;
-        public GraphicsContext BackgroundContext;
+
+        internal IEGL10 egl;
+        internal EGLDisplay eglDisplay;
+        EGLSurface eglSurface;
+        EGLContext eglContext;
+        internal EGLContext eglBackgroundContext;
+        internal EGLSurface eglBackgroundSurface;
 
         public AndroidGameWindow(Context context, Game game) : base(context)
         {
@@ -90,7 +99,6 @@ namespace Microsoft.Xna.Framework
 						
         private void Initialize()
         {
-
             this.Closed +=	new EventHandler<EventArgs>(GameWindow_Closed);            
 			clientBounds = new Rectangle(0, 0, Context.Resources.DisplayMetrics.WidthPixels, Context.Resources.DisplayMetrics.HeightPixels);
 
@@ -151,19 +159,168 @@ namespace Microsoft.Xna.Framework
 			//
 		}
 		
+        void ThrowEglError(string message)
+        {
+            ThrowEglError(message, egl.EglGetError());
+        }
+
+        void ThrowEglError(string message, int error)
+        {
+            string errorDesc;
+            switch (error)
+            {
+                case EGL10.EglBadDisplay:
+                    errorDesc = "EGL_BAD_DISPLAY";
+                    break;
+                case EGL10.EglNotInitialized:
+                    errorDesc = "EGL_NOT_INITIALIZED";
+                    break;
+                case EGL10.EglBadNativePixmap:
+                    errorDesc = "EGL_BAD_NATIVE_PIXMAP";
+                    break;
+                case EGL10.EglBadNativeWindow:
+                    errorDesc = "EGL_BAD_NATIVE_WINDOW";
+                    break;
+                case EGL10.EglBadMatch:
+                    errorDesc = "EGL_BAD_MATCH";
+                    break;
+                case EGL10.EglBadConfig:
+                    errorDesc = "EGL_BAD_CONFIG";
+                    break;
+                case EGL10.EglBadAlloc:
+                    errorDesc = "EGL_BAD_ALLOC";
+                    break;
+                case EGL10.EglBadParameter:
+                    errorDesc = "EGL_BAD_PARAMETER";
+                    break;
+                case EGL10.EglBadAttribute:
+                    errorDesc = "EGL_BAD_ATTRIBUTE";
+                    break;
+                default:
+                    errorDesc = String.Format("0x{0:08x}", error);
+                    break;
+            }
+            throw new InvalidOperationException(String.Format("{0} ({1})", message, errorDesc));
+        }
+
 		protected override void CreateFrameBuffer()
 		{
+#if true
+            egl =  EGLContext.EGL.JavaCast<IEGL10>();
+            eglDisplay = egl.EglGetDisplay(EGL10.EglDefaultDisplay);
+            if (eglDisplay == EGL10.EglNoDisplay)
+                throw new NotSupportedException("Could not get default EGL display");
+
+            if (!egl.EglInitialize(eglDisplay, new int[] { 2, 0 }))
+            {
+                ThrowEglError("Failed to initialize EGL");
+            }
+
+            IGraphicsDeviceManager deviceManagerInterface = (IGraphicsDeviceManager)_game.Services.GetService(typeof(IGraphicsDeviceManager));
+            if (deviceManagerInterface == null)
+                throw new InvalidOperationException("Could not find GraphicsDeviceManager instance");
+
+            GraphicsDeviceManager deviceManager = deviceManagerInterface as GraphicsDeviceManager;
+            int desiredColorBitCount = 16;
+            switch (deviceManager.PreferredBackBufferFormat)
+            {
+                case SurfaceFormat.Bgr565:
+                    // The default value above
+                    break;
+                case SurfaceFormat.Color:
+                    desiredColorBitCount = 24;
+                    break;
+                default:
+                    throw new NotSupportedException("PreferredBackBufferFormat must be SurfaceFormat.Bgr565 or SurfaceFormat.Color");
+            }
+            int desiredDepthBitSize = 16;
+            int desiredStencilBitSize = 0;
+            switch (deviceManager.PreferredDepthStencilFormat)
+            {
+                case DepthFormat.Depth16:
+                    // The default value above
+                    break;
+                case DepthFormat.Depth24:
+                    desiredDepthBitSize = 24;
+                    break;
+                case DepthFormat.Depth24Stencil8:
+                    desiredDepthBitSize = 24;
+                    desiredStencilBitSize = 8;
+                    break;
+                case DepthFormat.None:
+                    desiredDepthBitSize = 0;
+                    break;
+            }
+
+            // This constant appears to be missing from EGL10
+            int EglOpenGLES2Bit = 4;
+            int[] configSpec = new int[]
+            {
+                EGL10.EglRenderableType, EglOpenGLES2Bit,
+                EGL10.EglBufferSize, desiredColorBitCount,
+                EGL10.EglDepthSize, desiredDepthBitSize,
+                EGL10.EglStencilSize, desiredStencilBitSize,
+                EGL10.EglNone
+            };
+            EGLConfig[] configs = new EGLConfig[1];
+            int[] numConfigs = new int[1];
+            if (!egl.EglChooseConfig(eglDisplay, configSpec, configs, configs.Length, numConfigs))
+                ThrowEglError("Failed to find a matching EGL config");
+            if (numConfigs[0] == 0)
+                ThrowEglError("Failed to find a matching EGL config");
+
+            eglSurface = egl.EglCreateWindowSurface(eglDisplay, configs[0], this, null);
+            if (eglSurface == EGL10.EglNoSurface)
+                ThrowEglError("Failed to create EGL window surface");
+
+//            int EglContextClientType = 0x3097;
+//            int[] contextSpec = new int[]
+//            {
+//                EglContextClientType, 2,
+//                EGL10.EglNone
+//            };
+            eglContext = egl.EglCreateContext(eglDisplay, configs[0], EGL10.EglNoContext, null);
+            if (eglContext == EGL10.EglNoContext)
+            {
+                ThrowEglError("Failed to create main EGL context");
+            }
+
+            egl.EglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
+
+            // Find a config for the background surface
+            configSpec = new int[]
+            {
+                EGL10.EglRenderableType, EglOpenGLES2Bit,
+                EGL10.EglBufferSize, desiredColorBitCount,
+                EGL10.EglDepthSize, desiredDepthBitSize,
+                EGL10.EglStencilSize, desiredStencilBitSize,
+                EGL10.EglSurfaceType, EGL10.EglPbufferBit,
+                EGL10.EglNone
+            };
+            if (!egl.EglChooseConfig(eglDisplay, configSpec, configs, configs.Length, numConfigs))
+                ThrowEglError("Failed to find a matching EGL config for background surface");
+
+            eglBackgroundSurface = egl.EglCreatePbufferSurface(eglDisplay, configs[0], null);
+            if (eglBackgroundSurface == EGL10.EglNoSurface)
+                ThrowEglError("Failed to create EGL window surface");
+
+            eglBackgroundContext = egl.EglCreateContext(eglDisplay, configs[0], EGL10.EglNoContext, null);
+            if (eglBackgroundContext == EGL10.EglNoContext)
+            {
+                ThrowEglError("Failed to create background EGL context");
+            }
+
+            Threading.Window = this;
+#else
             // Allow threaded resource loading
             OpenTK.Graphics.GraphicsContext.ShareContexts = true;
 
-#if true			
 			try
             {
                 GLContextVersion = GLContextVersion.Gles2_0;
 				base.CreateFrameBuffer();
 		    } 
 			catch (Exception) 
-#endif			
 			{
 #if ES11
                 //device doesn't support OpenGLES 2.0; retry with 1.1:
@@ -190,7 +347,8 @@ namespace Microsoft.Xna.Framework
             BackgroundContext = new GraphicsContext(mode, WindowInfo, 2, 0, flags);
             Threading.BackgroundContext = BackgroundContext;
             Threading.WindowInfo = WindowInfo;
-		}
+#endif
+        }
 
         protected override void OnLoad(EventArgs e)
         {

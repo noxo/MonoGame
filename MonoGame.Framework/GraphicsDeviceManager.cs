@@ -58,6 +58,8 @@ namespace Microsoft.Xna.Framework
     {
 		private Game _game;
 		private GraphicsDevice _graphicsDevice;
+        private SurfaceFormat _preferredBackBufferFormat;
+        private DepthFormat _preferredDepthStencilFormat;
 		private int _preferredBackBufferHeight;
 		private int _preferredBackBufferWidth;
 		private bool _preferMultiSampling;
@@ -76,6 +78,8 @@ namespace Microsoft.Xna.Framework
 			_supportedOrientations = DisplayOrientation.Default;
 			_preferredBackBufferHeight = game.Window.ClientBounds.Height;
 			_preferredBackBufferWidth = game.Window.ClientBounds.Width;
+            _preferredBackBufferFormat = SurfaceFormat.Bgr565;
+            _preferredDepthStencilFormat = DepthFormat.Depth16;
 			
             if (game.Services.GetService(typeof(IGraphicsDeviceManager)) != null)
             {
@@ -244,10 +248,11 @@ namespace Microsoft.Xna.Framework
         {
             get
             {
-                throw new NotImplementedException();
+                return _preferredBackBufferFormat;
             }
             set
             {
+                _preferredBackBufferFormat = value;
             }
         }
 
@@ -279,10 +284,11 @@ namespace Microsoft.Xna.Framework
         {
             get
             {
-                throw new NotImplementedException();
+                return _preferredDepthStencilFormat;
             }
             set
             {
+                _preferredDepthStencilFormat = value;
             }
         }
 

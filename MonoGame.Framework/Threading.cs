@@ -44,6 +44,7 @@ using System.Threading;
 #if ANDROID
 using OpenTK.Graphics;
 using OpenTK.Platform;
+using Javax.Microedition.Khronos.Egl;
 #endif
 #if IPHONE
 using MonoTouch.Foundation;
@@ -63,8 +64,7 @@ namespace Microsoft.Xna.Framework
 #if IPHONE
 		public static EAGLContext BackgroundContext;
 #elif ANDROID
-        public static GraphicsContext BackgroundContext;
-        public static IWindowInfo WindowInfo;
+        public static AndroidGameWindow Window;
 #endif
         static Mutex contextMutex = new Mutex();
 
@@ -85,8 +85,7 @@ namespace Microsoft.Xna.Framework
 			    if (EAGLContext.CurrentContext != BackgroundContext)
 				    EAGLContext.SetCurrentContext(BackgroundContext);
 #elif ANDROID
-                // FIXME: To be implemented
-                throw new NotImplementedException("Threaded creation of GPU resources is not currently supported on Android");
+                Window.egl.EglMakeCurrent(Window.eglDisplay, Window.eglBackgroundSurface, Window.eglBackgroundSurface, Window.eglBackgroundContext);
 #else
                 // FIXME: To be implemented
                 throw new NotImplementedException("Threaded creation of GPU resources is not currently supported on this platform");
@@ -100,7 +99,12 @@ namespace Microsoft.Xna.Framework
         internal static void End()
         {
             if (mainThreadId != Thread.CurrentThread.ManagedThreadId)
+            {
+#if ANDROID
+                Window.egl.EglMakeCurrent(Window.eglDisplay, null, null, null);
+#endif
                 contextMutex.ReleaseMutex();
+            }
         }
     }
 }
