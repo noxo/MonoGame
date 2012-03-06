@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Android\AndroidGamePlatform.cs" />
+    <Compile Include="Android\AndroidGraphicsContext.cs" />
     <Compile Include="Android\Input\Mouse.cs" />
     <Compile Include="Android\TitleContainer.cs" />
     <Compile Include="Audio\AudioCategory.cs" />

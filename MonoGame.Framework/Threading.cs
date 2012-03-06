@@ -85,7 +85,8 @@ namespace Microsoft.Xna.Framework
 			    if (EAGLContext.CurrentContext != BackgroundContext)
 				    EAGLContext.SetCurrentContext(BackgroundContext);
 #elif ANDROID
-                Window.egl.EglMakeCurrent(Window.eglDisplay, Window.eglBackgroundSurface, Window.eglBackgroundSurface, Window.eglBackgroundContext);
+                if (!Window.BackgroundContext.IsCurrent)
+                    Window.BackgroundContext.MakeCurrent(Window.WindowInfo);
 #else
                 // FIXME: To be implemented
                 throw new NotImplementedException("Threaded creation of GPU resources is not currently supported on this platform");
@@ -101,7 +102,7 @@ namespace Microsoft.Xna.Framework
             if (mainThreadId != Thread.CurrentThread.ManagedThreadId)
             {
 #if ANDROID
-                Window.egl.EglMakeCurrent(Window.eglDisplay, null, null, null);
+                Window.BackgroundContext.MakeCurrent(null);
 #endif
                 contextMutex.ReleaseMutex();
             }
