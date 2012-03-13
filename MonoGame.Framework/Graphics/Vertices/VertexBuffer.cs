@@ -41,8 +41,7 @@ namespace Microsoft.Xna.Framework.Graphics
             this.VertexCount = vertexCount;
             this.BufferUsage = bufferUsage;
 
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 //GLExt.Oes.GenVertexArrays(1, out this.vao);
                 //GLExt.Oes.BindVertexArray(this.vao);
@@ -55,11 +54,7 @@ namespace Microsoft.Xna.Framework.Graphics
                 GL.BufferData(BufferTarget.ArrayBuffer,
                               new IntPtr(vertexDeclaration.VertexStride * vertexCount), IntPtr.Zero,
                               dynamic ? BufferUsageHint.StreamDraw : BufferUsageHint.StaticDraw);
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
 		}
 
         public VertexBuffer(GraphicsDevice graphicsDevice, VertexDeclaration vertexDeclaration, int vertexCount, BufferUsage bufferUsage) :
@@ -88,8 +83,7 @@ namespace Microsoft.Xna.Framework.Graphics
             if ((vertexStride > (VertexCount * VertexDeclaration.VertexStride)) || (vertexStride < VertexDeclaration.VertexStride))
                 throw new ArgumentOutOfRangeException("One of the following conditions is true:\nThe vertex stride is larger than the vertex buffer.\nThe vertex stride is too small for the type of data requested.");
 
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
                 var elementSizeInByte = Marshal.SizeOf(typeof(T));
@@ -123,11 +117,7 @@ namespace Microsoft.Xna.Framework.Graphics
 #else
                 GL.UnmapBuffer(BufferTarget.ArrayBuffer);
 #endif
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
         }
 
         public void GetData<T>(T[] data, int startIndex, int elementCount) where T : struct
@@ -153,16 +143,11 @@ namespace Microsoft.Xna.Framework.Graphics
 
             var elementSizeInByte = Marshal.SizeOf(typeof(T));
             var sizeInBytes = elementSizeInByte * elementCount;
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
                 GL.BufferSubData<T>(BufferTarget.ArrayBuffer, new IntPtr(offsetInBytes), new IntPtr(sizeInBytes), data);
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
 		}
 		
 		public void SetData<T>(T[] data, int startIndex, int elementCount) where T : struct

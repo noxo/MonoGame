@@ -108,9 +108,8 @@ namespace Microsoft.Xna.Framework.Graphics
             this.levelCount = 1;
 
             this.glTarget = TextureTarget.Texture2D;
-            
-            Threading.Begin();
-            try
+
+            Threading.BlockOnUIThread(() =>
             {
 #if IPHONE || ANDROID
                 GL.GenTextures(1, ref this.glTexture);
@@ -165,11 +164,11 @@ namespace Microsoft.Xna.Framework.Graphics
                 {
                     GL.TexImage2D(TextureTarget.Texture2D, 0,
 #if IPHONE || ANDROID
-                        (int)glInternalFormat,
+ (int)glInternalFormat,
 #else				           
 					    glInternalFormat,
 #endif
-                        this.width, this.height, 0,
+ this.width, this.height, 0,
                         glFormat, glType, IntPtr.Zero);
                 }
 
@@ -190,11 +189,7 @@ namespace Microsoft.Xna.Framework.Graphics
                         this.levelCount++;
                     }
                 }
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
         }
 				
 		public Texture2D(GraphicsDevice graphicsDevice, int width, int height) : 
@@ -224,8 +219,7 @@ namespace Microsoft.Xna.Framework.Graphics
             if (data == null)
 				throw new ArgumentNullException("data");
 
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 var elementSizeInByte = Marshal.SizeOf(typeof(T));
                 var dataHandle = GCHandle.Alloc(data, GCHandleType.Pinned);
@@ -262,11 +256,7 @@ namespace Microsoft.Xna.Framework.Graphics
                                  glFormat, glType, dataPtr);
                 }
                 dataHandle.Free();
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
         }
 		
 		public void SetData<T>(T[] data, int startIndex, int elementCount) where T : struct
@@ -341,16 +331,11 @@ namespace Microsoft.Xna.Framework.Graphics
 				colorSpace.Dispose();
 				
                 Texture2D texture = null;
-                Threading.Begin();
-                try
+                Threading.BlockOnUIThread(() =>
                 {
 				    texture = new Texture2D(graphicsDevice, width, height, false, SurfaceFormat.Color);			
     				texture.SetData(data);
-                }
-                finally
-                {
-                    Threading.End();
-                }
+                });
 			
 				return texture;
 			}
@@ -394,16 +379,11 @@ namespace Microsoft.Xna.Framework.Graphics
 			}
 
             Texture2D texture = null;
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 texture = new Texture2D(graphicsDevice, width, height, false, SurfaceFormat.Color);
                 texture.SetData<int>(pixels);
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
             return texture;
 #else
             using (Bitmap image = (Bitmap)Bitmap.FromStream(stream))
@@ -420,16 +400,11 @@ namespace Microsoft.Xna.Framework.Graphics
                 image.UnlockBits(bitmapData);
 
                 Texture2D texture = null;
-                Threading.Begin();
-                try
+                Threading.BlockOnUIThread(() =>
                 {
                     texture = new Texture2D(graphicsDevice, image.Width, image.Height);
                     texture.SetData(data);
-                }
-                finally
-                {
-                    Threading.End();
-                }
+                });
 
                 return texture;
             }

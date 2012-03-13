@@ -155,8 +155,7 @@ namespace Microsoft.Xna.Framework.Graphics
 			glslCode = glslCode.Replace("#version 110\n", "");
 			glslCode = "precision mediump float;\nprecision mediump int;\n" + glslCode;
 #endif
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 shader = GL.CreateShader(shaderType);
 #if IPHONE || ANDROID
@@ -192,11 +191,7 @@ namespace Microsoft.Xna.Framework.Graphics
                     GL.DeleteShader(shader);
                     throw new InvalidOperationException("Shader Compilation Failed");
                 }
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
             //MojoShader.NativeMethods.MOJOSHADER_freeParseData(parseDataPtr);
 			//TODO: dispose properly - DXPreshader holds unmanaged data
 		}

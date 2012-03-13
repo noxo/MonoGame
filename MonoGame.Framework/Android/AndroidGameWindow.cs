@@ -60,6 +60,8 @@ using OpenTK.Graphics;
 
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Input.Touch;
+using System.Threading;
+using System.Diagnostics;
 #endregion Using Statements
 
 namespace Microsoft.Xna.Framework
@@ -76,11 +78,9 @@ namespace Microsoft.Xna.Framework
         private bool resetRenderElapsedTime = false;
         double updateFrameElapsed;
         double renderFrameElapsed;
-        double updateFrameTotal;
-        double renderFrameTotal;
         double updateFrameLast;
         double renderFrameLast;
-        public GraphicsContext BackgroundContext;
+        Thread loadingWorker;
 
         public AndroidGameWindow(Context context, Game game) : base(context)
         {
@@ -148,13 +148,29 @@ namespace Microsoft.Xna.Framework
 
         ~AndroidGameWindow()
 		{
-			//
+            // Quits the loading worker thread and waits until it has shut itelf down
+            if (loadingWorker != null)
+            {
+                Threading.BlockOnUIThread(() => { AndroidGameWindow.QuitLoadingWorker(); });
+            }
 		}
-		
+
+        /// <summary>
+        /// Allows the loading worker thread to continue until the system requests it be shut down.
+        /// </summary>
+        static bool quitLoadingWorker = false;
+
+        /// <summary>
+        /// Request the loading worker thread shut itself down.
+        /// </summary>
+        static void QuitLoadingWorker()
+        {
+            quitLoadingWorker = true;
+        }
+
 		protected override void CreateFrameBuffer()
 		{
-            // Allow threaded resource loading
-            OpenTK.Graphics.GraphicsContext.ShareContexts = true;
+            Threading.Initialize();
 
 #if true			
 			try
@@ -180,16 +196,6 @@ namespace Microsoft.Xna.Framework
 
             if (!GraphicsContext.IsCurrent)
                 MakeCurrent();
-
-            // Create a context for the background loading
-            GraphicsContextFlags flags = GraphicsContextFlags.Default;
-#if DEBUG
-            //flags |= GraphicsContextFlags.Debug;
-#endif
-            GraphicsMode mode = new GraphicsMode();
-            BackgroundContext = new GraphicsContext(mode, WindowInfo, 2, 0, flags);
-            Threading.BackgroundContext = BackgroundContext;
-            Threading.WindowInfo = WindowInfo;
 		}
 
         protected override void OnLoad(EventArgs e)
@@ -212,12 +218,13 @@ namespace Microsoft.Xna.Framework
             if (GraphicsContext == null || GraphicsContext.IsDisposed)
                 return;
 
-            //Should not happen at all..
             if (!GraphicsContext.IsCurrent)
                 MakeCurrent();
 
             if (_game != null)
             {
+                Threading.Run();
+
                 double targetElapsed = _game.TargetElapsedTime.TotalSeconds;
                 renderFrameElapsed += e.Time;
                 if (renderFrameElapsed < (renderFrameLast + targetElapsed))
@@ -241,28 +248,33 @@ namespace Microsoft.Xna.Framework
             {
                 SwapBuffers();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Android.Util.Log.Error("Error in swap buffers", ex.ToString());
             }
         }
 
         protected override void OnUpdateFrame(FrameEventArgs e)
-		{			
+		{
 			base.OnUpdateFrame(e);
 
-			if (_game != null )
+            if (!GraphicsContext.IsCurrent)
+                MakeCurrent();
+            
+            if (_game != null)
 			{
+                Threading.Run();
+
                 double targetElapsed = _game.TargetElapsedTime.TotalSeconds;
                 updateFrameElapsed += e.Time;
                 if (updateFrameElapsed < (updateFrameLast + targetElapsed))
                     return;
 
-				if (resetUpdateElapsedTime)
+                if (resetUpdateElapsedTime)
                 {
                     updateFrameElapsed = updateFrameLast + targetElapsed;
-					resetUpdateElapsedTime = false;
-				}
+                    resetUpdateElapsedTime = false;
+                }
 
                 double delta = updateFrameElapsed - updateFrameLast;
                 if (_game.IsFixedTimeStep)

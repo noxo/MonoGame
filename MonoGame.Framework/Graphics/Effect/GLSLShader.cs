@@ -157,40 +157,43 @@ namespace Microsoft.Xna.Framework.Graphics
 						 precision mediump int;
 						"+glslCode;
 #endif
-			
-			shader = GL.CreateShader (shaderType);
+            Threading.BlockOnUIThread(() =>
+            {
+                shader = GL.CreateShader(shaderType);
 #if IPHONE || ANDROID
-			GL.ShaderSource (shader, 1, new string[]{glslCode}, (int[])null);
+                GL.ShaderSource(shader, 1, new string[] { glslCode }, (int[])null);
 #else			
-			GL.ShaderSource (shader, glslCode);
+			    GL.ShaderSource (shader, glslCode);
 #endif
-			GL.CompileShader(shader);
-			
-			int compiled = 0;
+                GL.CompileShader(shader);
+
+                int compiled = 0;
 #if IPHONE || ANDROID
-			GL.GetShader (shader, ShaderParameter.CompileStatus, ref compiled);
+                GL.GetShader(shader, ShaderParameter.CompileStatus, ref compiled);
 #else
-			GL.GetShader (shader, ShaderParameter.CompileStatus, out compiled);
+			    GL.GetShader (shader, ShaderParameter.CompileStatus, out compiled);
 #endif
-			if (compiled == (int)All.False) {
+                if (compiled == (int)All.False)
+                {
 #if IPHONE || ANDROID
-				string log = "";
-				int length = 0;
-				GL.GetShader (shader, ShaderParameter.InfoLogLength, ref length);
-				if (length > 0) {
-					var logBuilder = new StringBuilder(length);
-					GL.GetShaderInfoLog(shader, length, ref length, logBuilder);
-					log = logBuilder.ToString();
-				}
+                    string log = "";
+                    int length = 0;
+                    GL.GetShader(shader, ShaderParameter.InfoLogLength, ref length);
+                    if (length > 0)
+                    {
+                        var logBuilder = new StringBuilder(length);
+                        GL.GetShaderInfoLog(shader, length, ref length, logBuilder);
+                        log = logBuilder.ToString();
+                    }
 #else
-				string log = GL.GetShaderInfoLog(shader);
+				    string log = GL.GetShaderInfoLog(shader);
 #endif
-				Console.WriteLine (log);
-				
-				GL.DeleteShader (shader);
-				throw new InvalidOperationException("Shader Compilation Failed");
-			}
-				
+                    Console.WriteLine(log);
+
+                    GL.DeleteShader(shader);
+                    throw new InvalidOperationException("Shader Compilation Failed");
+                }
+            });
 		}
 
 		public void OnLink(int program) {

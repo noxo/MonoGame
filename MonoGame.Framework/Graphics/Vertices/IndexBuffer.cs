@@ -39,8 +39,7 @@ namespace Microsoft.Xna.Framework.Graphics
 			
 			var sizeInBytes = indexCount * (this.IndexElementSize == IndexElementSize.SixteenBits ? 2 : 4);
 
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
 #if IPHONE || ANDROID
                 GL.GenBuffers(1, ref ibo);
@@ -50,11 +49,7 @@ namespace Microsoft.Xna.Framework.Graphics
                 GL.BindBuffer(BufferTarget.ElementArrayBuffer, ibo);
                 GL.BufferData(BufferTarget.ElementArrayBuffer,
                               (IntPtr)sizeInBytes, IntPtr.Zero, dynamic ? BufferUsageHint.StreamDraw : BufferUsageHint.StaticDraw);
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
 		}
 		
 		public IndexBuffer(GraphicsDevice graphicsDevice, IndexElementSize indexElementSize, int indexCount, BufferUsage bufferUsage) :
@@ -83,8 +78,7 @@ namespace Microsoft.Xna.Framework.Graphics
             if (BufferUsage == BufferUsage.WriteOnly)
                 throw new NotSupportedException("This IndexBuffer was created with a usage type of BufferUsage.WriteOnly. Calling GetData on a resource that was created with BufferUsage.WriteOnly is not supported.");
 
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 GL.BindBuffer(BufferTarget.ArrayBuffer, ibo);
                 var elementSizeInByte = Marshal.SizeOf(typeof(T));
@@ -116,11 +110,7 @@ namespace Microsoft.Xna.Framework.Graphics
 #else
                 GL.UnmapBuffer(BufferTarget.ArrayBuffer);
 #endif
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
         }
 
         public void GetData<T>(T[] data, int startIndex, int elementCount) where T : struct
@@ -137,8 +127,7 @@ namespace Microsoft.Xna.Framework.Graphics
         {
 			if (data == null) throw new ArgumentNullException("data");
 
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 var elementSizeInByte = Marshal.SizeOf(typeof(T));
                 var sizeInBytes = elementSizeInByte * elementCount;
@@ -149,11 +138,7 @@ namespace Microsoft.Xna.Framework.Graphics
                 GL.BufferSubData(BufferTarget.ElementArrayBuffer, (IntPtr)offsetInBytes, (IntPtr)sizeInBytes, dataPtr);
 
                 dataHandle.Free();
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
 		}
 		
 		public void SetData<T>(T[] data, int startIndex, int elementCount) where T : struct

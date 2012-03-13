@@ -40,6 +40,7 @@ purpose and non-infringement.
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 #if ANDROID
 using OpenTK.Graphics;
@@ -60,47 +61,89 @@ namespace Microsoft.Xna.Framework
     internal class Threading
     {
         static int mainThreadId;
-#if IPHONE
-		public static EAGLContext BackgroundContext;
-#elif ANDROID
-        public static GraphicsContext BackgroundContext;
-        public static IWindowInfo WindowInfo;
+#if MONOMAC || ANDROID || LINUX || WINDOWS
+        static List<Action> actions = new List<Action>();
+#elif IPHONE
+        public static EAGLContext BackgroundContext;
 #endif
-        static Mutex contextMutex = new Mutex();
 
-        static Threading()
+        internal static void Initialize()
         {
             mainThreadId = Thread.CurrentThread.ManagedThreadId;
         }
 
         /// <summary>
-        /// To be called prior to any GL calls that may happen on a secondary thread. If called on a A shared context
+        /// Runs the given action on the UI thread and blocks the current thread while the action is running.
+        /// If the current thread is the UI thread, the action will run immediately.
         /// </summary>
-        internal static void Begin()
+        /// <param name="action">The action to be run on the UI thread</param>
+        internal static void BlockOnUIThread(Action action)
         {
-            if (mainThreadId != Thread.CurrentThread.ManagedThreadId)
+            if (action == null)
+                throw new ArgumentNullException("action cannot be null");
+
+            // If we are on the main thread, just call the action and return
+            int threadId = Thread.CurrentThread.ManagedThreadId;
+            if (mainThreadId == threadId)
             {
-                contextMutex.WaitOne();
+                action();
+                return;
+            }
+
 #if IPHONE
-			    if (EAGLContext.CurrentContext != BackgroundContext)
-				    EAGLContext.SetCurrentContext(BackgroundContext);
-#elif ANDROID
-                // FIXME: To be implemented
-                throw new NotImplementedException("Threaded creation of GPU resources is not currently supported on Android");
+            lock (BackgroundContext)
+            {
+                if (EAGLContext.CurrentContext != BackgroundContext)
+                    EAGLContext.SetCurrentContext(BackgroundContext);
+                action();
+            }
 #else
-                // FIXME: To be implemented
-                throw new NotImplementedException("Threaded creation of GPU resources is not currently supported on this platform");
+            ManualResetEventSlim resetEvent = new ManualResetEventSlim(false);
+            try
+            {
+                Add(() =>
+                {
+                    action();
+                    resetEvent.Set();
+                });
+                resetEvent.Wait();
+            }
+            finally
+            {
+                resetEvent.Dispose();
+            }
 #endif
+        }
+
+#if MONOMAC || ANDROID || LINUX || WINDOWS
+        static void Add(Action action)
+        {
+            lock (actions)
+            {
+                actions.Add(action);
             }
         }
 
         /// <summary>
-        /// To be called after the GL calls that may happen on a secondary thread.
+        /// Runs all pending actions.  Must be called from the UI thread.
         /// </summary>
-        internal static void End()
+        internal static void Run()
         {
-            if (mainThreadId != Thread.CurrentThread.ManagedThreadId)
-                contextMutex.ReleaseMutex();
+            Action action;
+            lock (actions)
+            {
+                action = actions.Count > 0 ? actions[0] : null;
+            }
+            while (action != null)
+            {
+                action();
+                lock (actions)
+                {
+                    actions.RemoveAt(0);
+                    action = actions.Count > 0 ? actions[0] : null;
+                }
+            }
         }
+#endif
     }
 }

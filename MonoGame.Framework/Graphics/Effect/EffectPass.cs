@@ -79,8 +79,7 @@ namespace Microsoft.Xna.Framework.Graphics
 			rasterizerState = new RasterizerState();
 			
 			Console.WriteLine (technique.Name);
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 shaderProgram = GL.CreateProgram();
 
@@ -189,11 +188,7 @@ namespace Microsoft.Xna.Framework.Graphics
                 {
                     Link();
                 }
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
         }
 
 		public EffectPass(EffectTechnique technique, GLSLEffectObject.glslPass pass)
