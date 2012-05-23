@@ -79,15 +79,13 @@ namespace Microsoft.Xna.Framework
 {
     class MetroGamePlatform : GamePlatform
     {
-        private MetroGameWindow _window;
 		//private OpenALSoundController soundControllerInstance = null;
 
         public MetroGamePlatform(Game game)
             : base(game)
         {
-            _window = new MetroGameWindow();
-            _window.Game = game;
-            this.Window = _window;
+            MetroGameWindow.Instance.Game = game;
+            this.Window = MetroGameWindow.Instance;
 			
 			// Setup our OpenALSoundController to handle our SoundBuffer pools
 			//soundControllerInstance = OpenALSoundController.GetInstance;			
@@ -100,7 +98,7 @@ namespace Microsoft.Xna.Framework
 
         public override void RunLoop()
         {
-            _window.RunLoop();
+            MetroGameWindow.Instance.RunLoop();
         }
 
         public override void StartRunLoop()
@@ -110,10 +108,10 @@ namespace Microsoft.Xna.Framework
         
         public override void Exit()
         {
-            if (!_window.IsExiting)
+            if (!MetroGameWindow.Instance.IsExiting)
             {
                 //Net.NetworkSession.Exit();
-                _window.IsExiting = true;
+                MetroGameWindow.Instance.IsExiting = true;
             }
         }
 
@@ -126,6 +124,21 @@ namespace Microsoft.Xna.Framework
 
         public override bool BeforeDraw(GameTime gameTime)
         {
+            var device = Game.GraphicsDevice;
+            if (device != null)
+            {
+                // For a Metro app we need to re-apply the
+                // render target before every draw.  
+                // 
+                // I guess the OS changes it and doesn't restore it?
+                var binding = device.GetRenderTargets();
+                var viewport = device.Viewport;
+                var scissor = device.ScissorRectangle;
+                device.ApplyRenderTargets(binding);
+                device.Viewport = viewport;
+                device.ScissorRectangle = scissor;
+            }
+
             return true;
         }
 
@@ -161,7 +174,7 @@ namespace Microsoft.Xna.Framework
 
         protected override void OnIsMouseVisibleChanged() 
         {
-            _window.SetCursor(Game.IsMouseVisible);
+            MetroGameWindow.Instance.SetCursor(Game.IsMouseVisible);
         }
 		
         protected override void Dispose(bool disposing)
@@ -171,7 +184,7 @@ namespace Microsoft.Xna.Framework
             if (graphicsDeviceManager != null)
                 graphicsDeviceManager.Dispose();
 
-            _window.Dispose();
+            MetroGameWindow.Instance.Dispose();
 			
 			base.Dispose(disposing);
         }

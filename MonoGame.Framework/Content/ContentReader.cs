@@ -151,7 +151,25 @@ namespace Microsoft.Xna.Framework.Content
             if (!String.IsNullOrEmpty(externalReference))
             {
 #if WINRT
-                return contentManager.Load<T>(externalReference);
+                var notSeparator = '/';
+                var separator = '\\';
+
+                externalReference = externalReference.Replace(notSeparator, separator);
+
+                var fullAssetName = assetName.Replace(notSeparator, separator);
+                var pathDirectory = Path.GetDirectoryName(fullAssetName);
+                var fullAssetPath = Path.Combine(pathDirectory, externalReference);
+
+                // HACK: This is the only way i can find of normalizing/canonicalizing paths
+                // in WinRT.  We should look for a better method in the upcoming updates.
+                {
+                    var package = Windows.ApplicationModel.Package.Current;
+                    fullAssetPath = Path.Combine(package.InstalledLocation.Path, fullAssetPath);
+                    fullAssetPath = new Uri(fullAssetPath).LocalPath;
+                    fullAssetPath = fullAssetPath.Substring(package.InstalledLocation.Path.Length + 1);
+                }
+
+                return contentManager.Load<T>(fullAssetPath);
 #else
                 externalReference = externalReference.Replace('\\', Path.DirectorySeparatorChar);
 

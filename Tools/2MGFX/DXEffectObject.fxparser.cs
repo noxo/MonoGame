@@ -48,10 +48,12 @@ namespace Microsoft.Xna.Framework.Graphics
             }
             effect.Parameters = parameters.ToArray();
 
-            // Fix up the samplers in the shaders to 
-            // include the parameter name.
+            // Fix up the samplers and constant buffers.
             foreach (var shader in effect.Shaders)
-                shader.SetSamplerParameters(samplers);
+            {
+                shader.SetSamplerParameters(samplers, parameters);
+                shader.CreateConstantBuffer(parameters, effect.ConstantBuffers);
+            }
 
             return effect;
         }
@@ -76,6 +78,9 @@ namespace Microsoft.Xna.Framework.Graphics
 
             // Initialize the list of unique shaders.
             Shaders = new List<DXShader>();
+
+            // Not used yet... but will be!
+            ConstantBuffers = new List<ConstantBuffer>();
 
 			using (var stream = new MemoryStream(effectCode, (int)baseOffset, (int)(effectCode.Length-baseOffset)))
             using (var reader = new BinaryReader(stream))

@@ -42,7 +42,15 @@ namespace Microsoft.Xna.Framework.Graphics
 
         #endregion
 
-        static internal readonly byte[] Bytecode = LoadEffectResource("Microsoft.Xna.Framework.Graphics.Effect.Resources.SpriteEffect.mgfx");
+        static internal readonly byte[] Bytecode = LoadEffectResource(
+#if DIRECTX
+            "Microsoft.Xna.Framework.Graphics.Effect.Resources.SpriteEffect.dx11.mgfxo"
+#elif PSS
+            "MonoGame.Framework.PSSuite.PSSuite.Graphics.Resources.Texture.cgx" //FIXME: This shader is totally incomplete
+#else
+            "Microsoft.Xna.Framework.Graphics.Effect.Resources.SpriteEffect.mgfx"
+#endif
+        );
 
         #region Methods
 

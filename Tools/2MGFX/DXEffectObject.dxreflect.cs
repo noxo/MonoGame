@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Diagnostics;
 
 namespace Microsoft.Xna.Framework.Graphics
 {
     partial class DXEffectObject
     {
+        public List<ConstantBuffer> ConstantBuffers { get; private set; }
+        
         private DXEffectObject()
         {
         }
@@ -21,16 +24,12 @@ namespace Microsoft.Xna.Framework.Graphics
 
                 var desc = dxeffect.Description;
 
-                for (var i = 0; i < desc.ConstantBufferCount; i++)
-                {
-                    var cbuffer = dxeffect.GetConstantBufferByIndex(i);
-                }
+                // These are filled out as we process stuff.
+                effect.ConstantBuffers = new List<ConstantBuffer>();
+                effect.Shaders = new List<DXShader>();
 
-                effect.Objects = new d3dx_parameter[0];
-                effect.Parameters = new d3dx_parameter[desc.GlobalVariableCount];
-                for (var i = 0; i < desc.GlobalVariableCount; i++)
-                    effect.Parameters[i] = effect.GetParameter( dxeffect.GetVariableByIndex(i) );
-
+                // Go thru the techniques and that will find all the 
+                // shaders and constant buffers.
                 effect.Techniques = new d3dx_technique[desc.TechniqueCount];
                 for (var i = 0; i < desc.TechniqueCount; i++)
                 {
@@ -39,56 +38,102 @@ namespace Microsoft.Xna.Framework.Graphics
                     var technique = new d3dx_technique();
                     technique.name = dxtechnique.Description.Name;
                     technique.pass_count = (uint)dxtechnique.Description.PassCount;
+                    technique.pass_handles = new d3dx_pass[technique.pass_count];
 
                     for (var p = 0; p < dxtechnique.Description.PassCount; p++)
                     {
                         var dxpass = dxtechnique.GetPassByIndex(p);
 
                         var pass = new d3dx_pass();
-                        pass.name = dxpass.Description.Name;
+                        pass.name = dxpass.Description.Name ?? string.Empty;
                         pass.states = new d3dx_state[2];
+                        pass.state_count = 2;
 
-                        if (dxpass.PixelShaderDescription.Variable.IsValid)
-                        {                            
-                            pass.states[pass.state_count] = effect.GetState(dxpass.PixelShaderDescription.Variable);
-                            pass.state_count++;
-                        }
+                        if (    !dxpass.PixelShaderDescription.Variable.IsValid ||
+                                !dxpass.VertexShaderDescription.Variable.IsValid)
+                            throw new Exception("Passed must have a vertex and pixel shader assigned!");
 
-                        if (dxpass.VertexShaderDescription.Variable.IsValid)
-                        {
-                            pass.states[pass.state_count] = effect.GetState(dxpass.VertexShaderDescription.Variable); ;
-                            pass.state_count++;
-                        }
+                        pass.states[0] = effect.GetState(dxpass.PixelShaderDescription.Variable);
+                        pass.states[1] = effect.GetState(dxpass.VertexShaderDescription.Variable);
+
+                        technique.pass_handles[p] = pass;
                     }
 
                     effect.Techniques[i] = technique;
                 }
                 
-                /*
-                var desc = dxeffect.Description.TechniqueCount;
-                var vsarray = dxeffect.GetVariableByName("VSArray");
-                if (vsarray != null)
+                // Make the list of parameters by combining all the
+                // constant buffers ignoring the buffer offsets.
+                var parameters = new List<d3dx_parameter>();
+                for (var c = 0; c < effect.ConstantBuffers.Count; c++ )
                 {
-                    var elem = vsarray.GetElement(0);
-                    var shader = elem.AsShader();
-                    for (var v = 0; v < vsarray.TypeInfo.Description.Elements; v++)
+                    var cb = effect.ConstantBuffers[c];
+
+                    for (var i = 0; i < cb.Parameters.Count; i++ )
                     {
-                        var shaderDesc = shader.GetShaderDescription(v);
-                        var signature = shaderDesc.Signature;
-                        //var shader = new SharpDX.Direct3D11.VertexShader(  );
+                        var param = cb.Parameters[i];
+
+                        var match = parameters.FindIndex(e => e.name == param.name);
+                        if (match == -1)
+                        {
+                            cb.ParameterIndex.Add(parameters.Count);
+                            cb.ParameterOffset.Add(param.bufferOffset);
+                            parameters.Add(param);
+                        }
+                        else
+                        {
+                            // TODO: Make sure the type and size of 
+                            // the parameter match up!
+                            cb.ParameterIndex.Add(match);
+                            cb.ParameterOffset.Add(param.bufferOffset);
+                        }
                     }
                 }
 
-                if (desc.TechniqueCount > 0)
+                // Add the texture parameters from the samplers.
+                foreach (var shader in effect.Shaders)
                 {
-                    var technique = dxeffect.GetTechniqueByIndex(0);
-                    var techniqueDesc = technique.Description;
-                    var pass = technique.GetPassByIndex(0);
-                    var passDesc = pass.Description;
-                    var pixelShader = pass.PixelShaderDescription.Variable.AsShader();
-                    var vertexShader = pass.VertexShaderDescription.Variable.AsShader();
+                    for (var s = 0; s < shader._samplers.Length; s++)
+                    {
+                        var sampler = shader._samplers[s];
+
+                        var match = parameters.FindIndex(e => e.name == sampler.name);
+                        if (match == -1)
+                        {
+                            shader._samplers[s].parameter = parameters.Count;
+
+                            var param = new d3dx_parameter();
+                            param.class_ = D3DXPARAMETER_CLASS.OBJECT;
+                            param.type = D3DXPARAMETER_TYPE.TEXTURE2D; // TODO: Fix this right!
+                            param.name = sampler.name;
+                            param.semantic = string.Empty;
+
+                            parameters.Add(param);
+                        }
+                        else
+                        {
+                            // TODO: Make sure the type and size of 
+                            // the parameter match up!
+
+                            shader._samplers[s].parameter = match;
+                        }
+                    }
                 }
-                */
+
+                // Now find the things we could not in the constant
+                // buffer reflection interface...  semantics and annotations.
+                for (var i = 0; i < parameters.Count; i++)
+                {
+                    var vdesc = dxeffect.GetVariableByName(parameters[i].name);
+                    if (!vdesc.IsValid)
+                        continue;
+
+                    parameters[i].semantic = vdesc.Description.Semantic ?? string.Empty;
+
+                    // TODO: Annotations!
+                }
+
+                effect.Parameters = parameters.ToArray();
 
                 return effect;
             }
@@ -98,61 +143,61 @@ namespace Microsoft.Xna.Framework.Graphics
         {
             var param = new d3dx_parameter();
 
+            var typeDesc = variable.TypeInfo.Description;
+
             param.name = variable.Description.Name ?? string.Empty;
             param.semantic = variable.Description.Semantic ?? string.Empty;
 
             // These exactly line up.
-            param.class_ = (D3DXPARAMETER_CLASS)variable.TypeInfo.Description.Class;
-            param.type = (D3DXPARAMETER_TYPE)variable.TypeInfo.Description.Type;
+            param.class_ = (D3DXPARAMETER_CLASS)typeDesc.Class;
+            param.type = (D3DXPARAMETER_TYPE)typeDesc.Type;
 
-            param.rows = (uint)variable.TypeInfo.Description.Rows;
-            param.columns = (uint)variable.TypeInfo.Description.Columns;
-
-            // TOOD: Look up into shared Object array!
+            param.rows = (uint)typeDesc.Rows;
+            param.columns = (uint)typeDesc.Columns;
 
             switch (param.type)
             {
                 case D3DXPARAMETER_TYPE.PIXELSHADER:
                 case D3DXPARAMETER_TYPE.VERTEXSHADER:
                 {
-                    var shaderDesc = ((SharpDX.Direct3D11.EffectShaderVariable)variable).GetShaderDescription(0);
-
-                    var shaderVar = variable.AsShader();
-
-                    for ( var i=0; i < shaderDesc.InputParameterCount; i++ )
-                    {
-                        var element = shaderVar.GetInputSignatureElementDescription( 0, i );
-                    }
-
-                    var bytecode = new byte[shaderDesc.Bytecode.Data.Length];
-                    shaderDesc.Bytecode.Data.Read(bytecode, 0, bytecode.Length);
-                    var shaderIndex = CreateShader(bytecode);
-                    param.data = shaderIndex; // new DXShader(bytecode, param.type == D3DXPARAMETER_TYPE.VERTEXSHADER);                    
-                    break;
+                    var shaderIndex = CreateShader(variable.AsShader());
+                    param.data = shaderIndex;
+					break;
                 }
 
+                case D3DXPARAMETER_TYPE.TEXTURE:
+                case D3DXPARAMETER_TYPE.TEXTURE1D:
+                case D3DXPARAMETER_TYPE.TEXTURE2D:
+                case D3DXPARAMETER_TYPE.TEXTURE3D:
+                case D3DXPARAMETER_TYPE.TEXTURECUBE:
+                    // Nothing to store for this type.
+                    break;
+
                 case D3DXPARAMETER_TYPE.SAMPLER:
+                case D3DXPARAMETER_TYPE.SAMPLER1D:
+                case D3DXPARAMETER_TYPE.SAMPLER2D:
+                case D3DXPARAMETER_TYPE.SAMPLER3D:
+                case D3DXPARAMETER_TYPE.SAMPLERCUBE:
                 {
+                    /*
                     var sampler = new d3dx_sampler();
                     sampler.state_count = 1;
                     sampler.states = new d3dx_state[1];
                     sampler.states[0] = GetState(variable);
+                    */
                     break;
                 }
 
                 default:
                 {
-                    if ( variable.TypeInfo.Description.PackedSize > 0 )
-                    {
-                        var raw = variable.GetRawValue(0);
-                        param.bytes = (uint)raw.Length;
-                        if (param.bytes > 0)
-                        {
-                            var data = new byte[param.bytes];
-                            raw.Read(data, 0, data.Length);
-                            param.data = data;
-                        }
-                    }
+                    if (param.rows == 0 || param.columns == 0)
+                        break;
+
+                    var size = (int)(param.rows * param.columns) * 4;
+                    var buffer = new byte[size];                    
+                    var raw = variable.GetRawValue(size);
+                    raw.Read(buffer, 0, size);                    
+                    param.data = buffer;
 
                     break;
                 }
@@ -162,42 +207,50 @@ namespace Microsoft.Xna.Framework.Graphics
                     throw new Exception("We don't support shader fragments!");
             }
 
-            //param.member_count = variable.TypeInfo.Description.Members;                    
-            //param.member_handles = variable.TypeInfo.nm
-            //param.member_count =
-            //param.members = 
-
             return param;
+        }
+
+        private int CreateShader(SharpDX.Direct3D11.EffectShaderVariable variable)
+        {
+            // Get the shader bytecode.
+            var desc = variable.GetShaderDescription(0);
+            var bytecode = new byte[desc.Bytecode.Data.Length];
+            desc.Bytecode.Data.Read(bytecode, 0, bytecode.Length);
+
+            // First look to see if we already created this same shader.
+            foreach (var shader in Shaders)
+            {
+                if (bytecode.SequenceEqual(shader.Bytecode))
+                    return shader.SharedIndex;
+            }
+
+            // Create a new shader.
+            var dxShader = new DXShader(bytecode, variable, ConstantBuffers, Shaders.Count);
+            Shaders.Add(dxShader);
+            
+            //var assmbly = desc.Bytecode.Disassemble();
+
+            //var buffer = reflection.GetConstantBuffer(0);
+
+            return dxShader.SharedIndex;
         }
 
         private d3dx_state GetState(SharpDX.Direct3D11.EffectVariable variable)
         {
             var state = new d3dx_state();
 
-            var dxsampler = variable.AsSampler();
             var dxshader = variable.AsShader();
-
-            if (dxsampler != null)
+            if (dxshader != null)
             {
-                var samplerState = dxsampler.GetSampler().Description;
-
                 state.index = 0;
-                state.operation = 164; // DXEffectObject.state_table texture!
-                state.type = STATE_TYPE.PARAMETER;
-
-                state.parameter = new d3dx_parameter();
-                state.parameter.object_id = 1;
-            }
-            else if (dxshader != null)
-            {
-                state.index = 0; // (uint)dxpass.PixelShaderDescription.Index;
                 state.type = STATE_TYPE.CONSTANT;
 
                 // This is from DXEffectObject.state_table! 
-                state.operation = variable.TypeInfo.Description.Type == SharpDX.D3DCompiler.ShaderVariableType.Vertexshader ? (uint)146 : (uint)147;
+                state.operation = 
+                    variable.TypeInfo.Description.Type == SharpDX.D3DCompiler.ShaderVariableType.Vertexshader ? 
+                    (uint)146 : (uint)147;
 
-                state.parameter = new d3dx_parameter();
-                state.parameter.object_id = 1;
+                state.parameter = GetParameter(variable);
             }
 
             return state;

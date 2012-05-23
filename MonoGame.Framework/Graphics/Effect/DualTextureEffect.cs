@@ -27,7 +27,8 @@ namespace Microsoft.Xna.Framework.Graphics
         EffectParameter fogColorParam;
         EffectParameter fogVectorParam;
         EffectParameter worldViewProjParam;
-        EffectParameter shaderIndexParam;
+
+        int _shaderIndex = -1;
 
         #endregion
 
@@ -51,7 +52,13 @@ namespace Microsoft.Xna.Framework.Graphics
 
         EffectDirtyFlags dirtyFlags = EffectDirtyFlags.All;
 
-        static readonly byte[] Bytecode = LoadEffectResource("Microsoft.Xna.Framework.Graphics.Effect.Resources.DualTextureEffect.mgfx");
+        static readonly byte[] Bytecode = LoadEffectResource(
+#if DIRECTX
+            "Microsoft.Xna.Framework.Graphics.Effect.Resources.DualTextureEffect.dx11.mgfxo"
+#else
+            "Microsoft.Xna.Framework.Graphics.Effect.Resources.DualTextureEffect.mgfx"
+#endif
+        );
 
         #endregion
 
@@ -288,7 +295,6 @@ namespace Microsoft.Xna.Framework.Graphics
             fogColorParam       = Parameters["FogColor"];
             fogVectorParam      = Parameters["FogVector"];
             worldViewProjParam  = Parameters["WorldViewProj"];
-            shaderIndexParam    = Parameters["ShaderIndex"];
         }
 
 
@@ -319,9 +325,14 @@ namespace Microsoft.Xna.Framework.Graphics
                 if (vertexColorEnabled)
                     shaderIndex += 2;
                 
-                shaderIndexParam.SetValue(shaderIndex);
-
                 dirtyFlags &= ~EffectDirtyFlags.ShaderIndex;
+
+                if (_shaderIndex != shaderIndex)
+                {
+                    _shaderIndex = shaderIndex;
+                    CurrentTechnique = Techniques[_shaderIndex];
+                    return true;
+                }
             }
 
             return false;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using TwoMGFX;
 
 namespace Microsoft.Xna.Framework.Graphics
 {
@@ -10,16 +11,26 @@ namespace Microsoft.Xna.Framework.Graphics
         /// <summary>
         /// Writes the effect for loading later.
         /// </summary>
-        public void Write(BinaryWriter writer)
+        public void Write(BinaryWriter writer, Options options)
         {
             // Write a very simple header for identification and versioning.
             writer.Write(Header.ToCharArray());
             writer.Write((byte)Version);
 
-            // Write all the shared shaders.
+            // Write an simple identifier for DX11 vs GLSL
+            // so we can easily detect the correct shader type.
+            var profile = (byte)( options.DX11Profile ? 1 : 0 );
+            writer.Write(profile);
+
+            // Write all the constant buffers.
+            writer.Write((byte)ConstantBuffers.Count);
+            foreach (var cbuffer in ConstantBuffers)
+                cbuffer.Write(writer, options);
+
+            // Write all the shaders.
             writer.Write((byte)Shaders.Count);
             foreach (var shader in Shaders)
-                shader.Write(writer);
+                shader.Write(writer, options);
 
             // Write the parameters.
             WriteParameters(writer, Parameters, Parameters.Length);

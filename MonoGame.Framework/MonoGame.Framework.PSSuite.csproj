@@ -8,8 +8,8 @@
     <ProjectGuid>{EA26E76F-FDFE-4A8C-B5A3-C3B5761E28F9}</ProjectGuid>
     <ProjectTypeGuids>{69878862-DA7D-4DC6-B0A1-50D8FAB4242F};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <OutputType>Library</OutputType>
-    <RootNamespace>MonoGame.Framwork.PSSuite</RootNamespace>
-    <AssemblyName>MonoGame.Framwork.PSSuite</AssemblyName>
+    <RootNamespace>MonoGame.Framework.PSSuite</RootNamespace>
+    <AssemblyName>MonoGame.Framework.PSSuite</AssemblyName>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -24,12 +24,13 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>none</DebugType>
-    <Optimize>false</Optimize>
+    <Optimize>true</Optimize>
     <OutputPath>bin\Release</OutputPath>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>PSS</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -304,6 +305,7 @@
     <Compile Include="Graphics\Effect\EffectAnnotationCollection.cs" />
     <Compile Include="Graphics\Effect\EffectAnnotation.cs" />
     <Compile Include="Graphics\Vertices\VertexDeclaration.cs" />
+    <Compile Include="Graphics\Vertices\VertexDeclarationCache.cs" />
     <Compile Include="Graphics\RenderTarget2D.cs" />
     <Compile Include="Audio\AudioCategory.cs" />
     <Compile Include="Graphics\SpriteBatch.cs" />
@@ -316,7 +318,6 @@
     <Compile Include="GameWindow.cs" />
     <Compile Include="GraphicsDeviceManager.cs" />
     <Compile Include="Graphics\PresentInterval.cs" />
-    <Compile Include="Graphics\SpriteBatcher.cs" />
     <Compile Include="Graphics\CubeMapFace.cs" />
     <Compile Include="Storage\StorageDeviceHelper.cs" />
     <Compile Include="Content\ContentReaders\BasicEffectReader.cs" />
@@ -341,6 +342,8 @@
     <Compile Include="Content\ContentReaders\EffectReader.cs" />
     <Compile Include="PSSuite\PSSHelper.cs" />
     <Compile Include="PSSuite\PSSExtensions.cs" />
+    <Compile Include="Graphics\Effect\ConstantBuffer.cs" />
+    <Compile Include="PSSuite\Graphics\SpriteBatcher.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="PSSuite\" />
@@ -372,4 +375,10 @@
       </Properties>
     </MonoDevelop>
   </ProjectExtensions>
+  <ItemGroup>
+    <EmbeddedShaderProgram Include="PSSuite\Graphics\Resources\BasicEffect.fcg" />
+    <EmbeddedShaderProgram Include="PSSuite\Graphics\Resources\BasicEffect.vcg" />
+    <EmbeddedShaderProgram Include="PSSuite\Graphics\Resources\Texture.fcg" />
+    <EmbeddedShaderProgram Include="PSSuite\Graphics\Resources\Texture.vcg" />
+  </ItemGroup>
 </Project>

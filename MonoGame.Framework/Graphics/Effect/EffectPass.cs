@@ -47,6 +47,10 @@ namespace Microsoft.Xna.Framework.Graphics
 
 #endif // OPENGL
 
+#if PSS
+        internal ShaderProgram _shaderProgram;
+#endif
+
         internal EffectPass(    Effect effect, 
                                 string name,
                                 DXShader vertexShader, 
@@ -90,20 +94,17 @@ namespace Microsoft.Xna.Framework.Graphics
             _depthStencilState = cloneSource._depthStencilState;
             _rasterizerState = cloneSource._rasterizerState;
             Annotations = cloneSource.Annotations;
-#if OPENGL
+            _vertexShader = cloneSource._vertexShader;
+            _pixelShader = cloneSource._pixelShader;
+#if OPENGL || PSS
             _shaderProgram = cloneSource._shaderProgram;
 #endif
-
-            // Clone the mutable types.
-            _vertexShader = new DXShader(cloneSource._vertexShader);
-            _pixelShader = new DXShader(cloneSource._pixelShader);
         }
 
         private void Initialize()
         {
 #if OPENGL
-            Threading.Begin();
-            try
+            Threading.BlockOnUIThread(() =>
             {
                 // TODO: Shouldn't we be calling GL.DeleteProgram() somewhere?
 
@@ -134,14 +135,9 @@ namespace Microsoft.Xna.Framework.Graphics
 #endif
                     throw new InvalidOperationException("Unable to link effect program");
                 }
-            }
-            finally
-            {
-                Threading.End();
-            }
+            });
 
 #elif DIRECTX
-
 
 #endif
         }
@@ -162,8 +158,8 @@ namespace Microsoft.Xna.Framework.Graphics
 
 #if OPENGL
             GL.UseProgram(_shaderProgram);
-#elif DIRECTX
-
+#elif PSS
+            _effect.GraphicsDevice._graphics.SetShaderProgram(_shaderProgram);
 #endif
 
             var device = _effect.GraphicsDevice;
@@ -175,11 +171,23 @@ namespace Microsoft.Xna.Framework.Graphics
             if (_depthStencilState != null)
                 device.DepthStencilState = _depthStencilState;
 
-#if OPENGL
-
-            // We better have a vertex shader by now!
             Debug.Assert(_vertexShader != null, "Got a null vertex shader!");
-            _vertexShader.Apply(_shaderProgram, _effect.Parameters, device);
+            Debug.Assert(_pixelShader != null, "Got a null vertex shader!");
+
+#if PSS
+#warning We are only setting one hardcoded parameter here. Need to do this properly by iterating _effect.Parameters (Happens in DXShader)
+            float[] data;
+            if (_effect.Parameters["WorldViewProj"] != null) 
+                data = (float[])_effect.Parameters["WorldViewProj"].Data;
+            else
+                data = (float[])_effect.Parameters["MatrixTransform"].Data;
+            Sce.Pss.Core.Matrix4 matrix4 = PSSHelper.ToPssMatrix4(data);
+            matrix4 = matrix4.Transpose (); //When .Data is set the matrix is transposed, we need to do it again to undo it
+            _shaderProgram.SetUniformValue(0, ref matrix4);
+#elif OPENGL
+
+            // Apply the vertex shader.
+            _vertexShader.Apply(device, _shaderProgram, _effect.Parameters, _effect.ConstantBuffers);
 
             // Apply vertex shader fix:
             // The following two lines are appended to the end of vertex shaders
@@ -221,11 +229,16 @@ namespace Microsoft.Xna.Framework.Graphics
             var posFixupLoc = GL.GetUniformLocation(_shaderProgram, "posFixup"); // TODO: Look this up on link!
             GL.Uniform4(posFixupLoc, 1, _posFixup);
 
-            Debug.Assert(_pixelShader != null, "Got a null pixel shader!");
-            _pixelShader.Apply(_shaderProgram, _effect.Parameters, device);
+            // Apply the pixel shader.
+            _pixelShader.Apply(device, _shaderProgram, _effect.Parameters, _effect.ConstantBuffers);
 
 #elif DIRECTX
-            
+
+            // Apply the shaders which will in turn set the 
+            // constant buffers and texture samplers.
+            _vertexShader.Apply(device, _effect.Parameters, _effect.ConstantBuffers);
+            _pixelShader.Apply(device, _effect.Parameters, _effect.ConstantBuffers);
+
 #endif
         }
 		

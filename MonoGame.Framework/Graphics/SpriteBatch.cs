@@ -42,9 +42,9 @@ namespace Microsoft.Xna.Framework.Graphics
 			this.graphicsDevice = graphicsDevice;
 
             // Use a custom SpriteEffect so we can control the transformation matrix
-            spriteEffect = new Effect(this.graphicsDevice, SpriteEffect.Bytecode);
+            spriteEffect = new Effect(graphicsDevice, SpriteEffect.Bytecode);
 
-            _batcher = new SpriteBatcher();
+            _batcher = new SpriteBatcher(graphicsDevice);
 		}
 
 		public void Begin ()
@@ -94,11 +94,12 @@ namespace Microsoft.Xna.Framework.Graphics
 				Setup ();
 			}
 			Flush ();
-			
-			// clear out the textures
-			graphicsDevice.Textures._textures.Clear ();
-			
+					
 #if OPENGL
+
+			// clear out the textures
+			graphicsDevice.Textures.Clear ();
+
 			// unbinds shader
 			if (_effect != null) 
             {
@@ -107,7 +108,7 @@ namespace Microsoft.Xna.Framework.Graphics
 			}
 #endif
 
-		}
+        }
 		
 		void Setup () 
         {
@@ -119,9 +120,14 @@ namespace Microsoft.Xna.Framework.Graphics
 			if (_effect == null) 
             {
 				Viewport vp = graphicsDevice.Viewport;
-				Matrix projection = Matrix.CreateOrthographicOffCenter(0, vp.Width, vp.Height, 0, 0, 1);
+                Matrix projection = Matrix.CreateOrthographicOffCenter(0, vp.Width, vp.Height, 0, 0, 1);
+#if PSS
+                //PSS doesn't need the half pixel offset
+                Matrix transform = _matrix * projection;
+#else
 				Matrix halfPixelOffset = Matrix.CreateTranslation(-0.5f, -0.5f, 0);
 				Matrix transform = _matrix * (halfPixelOffset * projection);
+#endif
 				spriteEffect.Parameters["MatrixTransform"].SetValue (transform);
 				
 				spriteEffect.CurrentTechnique.Passes[0].Apply();
@@ -229,9 +235,7 @@ namespace Microsoft.Xna.Framework.Graphics
 			SpriteBatchItem item = _batcher.CreateBatchItem ();
 
 			item.Depth = depth;
-#if !WINRT && !PSS
-			item.TextureID = texture.glTexture;
-#endif
+			item.Texture = texture;
 
 			if (sourceRectangle.HasValue) {
 				tempRect = sourceRectangle.Value;

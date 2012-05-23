@@ -36,7 +36,8 @@ namespace Microsoft.Xna.Framework.Graphics
         EffectParameter worldInverseTransposeParam;
         EffectParameter worldViewProjParam;
         EffectParameter bonesParam;
-        EffectParameter shaderIndexParam;
+
+        int _shaderIndex = -1;
 
         #endregion
 
@@ -69,7 +70,13 @@ namespace Microsoft.Xna.Framework.Graphics
 
         EffectDirtyFlags dirtyFlags = EffectDirtyFlags.All;
 
-        static readonly byte[] Bytecode = LoadEffectResource("Microsoft.Xna.Framework.Graphics.Effect.Resources.SkinnedEffect.mgfx");
+        static readonly byte[] Bytecode = LoadEffectResource(
+#if DIRECTX
+            "Microsoft.Xna.Framework.Graphics.Effect.Resources.SkinnedEffect.dx11.mgfxo"
+#else
+            "Microsoft.Xna.Framework.Graphics.Effect.Resources.SkinnedEffect.mgfx"
+#endif
+        );            
 
         #endregion
 
@@ -465,7 +472,6 @@ namespace Microsoft.Xna.Framework.Graphics
             worldInverseTransposeParam  = Parameters["WorldInverseTranspose"];
             worldViewProjParam          = Parameters["WorldViewProj"];
             bonesParam                  = Parameters["Bones"];
-            shaderIndexParam            = Parameters["ShaderIndex"];
 
             light0 = new DirectionalLight(Parameters["DirLight0Direction"],
                                           Parameters["DirLight0DiffuseColor"],
@@ -530,9 +536,14 @@ namespace Microsoft.Xna.Framework.Graphics
                 else if (oneLight)
                     shaderIndex += 6;
 
-                shaderIndexParam.SetValue(shaderIndex);
-
                 dirtyFlags &= ~EffectDirtyFlags.ShaderIndex;
+
+                if (_shaderIndex != shaderIndex)
+                {
+                    _shaderIndex = shaderIndex;
+                    CurrentTechnique = Techniques[_shaderIndex];
+                    return true;
+                }
             }
 
             return false;
