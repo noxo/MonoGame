@@ -440,6 +440,10 @@ namespace Microsoft.Xna.Framework
         {
             // TODO: We shouldn't need to do this here.
             applyChanges(graphicsDeviceManager);
+            
+            // Guide needs to be initialised outside of GamerServicesComponent because parts of the Guide class
+            // can be used without having a GamerServicesComponent, such as keyboard input and showing a message box.
+            Guide.Initialise(this);
 
             // According to the information given on MSDN (see link below), all
             // GameComponents in Components at the time Initialize() is called
