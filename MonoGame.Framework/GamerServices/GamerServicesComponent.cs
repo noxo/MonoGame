@@ -99,8 +99,6 @@ namespace MonoGame.Xna.Framework.GamerServices {
                 }
             }
 #endif
-			Guide.Initialise(game);
-			
 		}
 
 		public override void Update (GameTime gameTime)
