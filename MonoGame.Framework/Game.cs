@@ -440,6 +440,10 @@ namespace Microsoft.Xna.Framework
         {
             // TODO: We shouldn't need to do this here.
             applyChanges(graphicsDeviceManager);
+            
+            // Guide needs to be initialised outside of GamerServicesComponent because parts of the Guide class
+            // can be used without having a GamerServicesComponent, such as keyboard input and showing a message box.
+            Guide.Initialise(this);
 
             // According to the information given on MSDN (see link below), all
             // GameComponents in Components at the time Initialize() is called
@@ -556,18 +560,21 @@ namespace Microsoft.Xna.Framework
 
         internal void applyChanges(GraphicsDeviceManager manager)
         {
-			Platform.BeginScreenDeviceChange(GraphicsDevice.PresentationParameters.IsFullScreen);
+            Platform.BeginScreenDeviceChange(GraphicsDevice.PresentationParameters.IsFullScreen);
             if (GraphicsDevice.PresentationParameters.IsFullScreen)
                 Platform.EnterFullScreen();
             else
                 Platform.ExitFullScreen();
 
-            var viewport = new Viewport(0, 0,
-			                            GraphicsDevice.PresentationParameters.BackBufferWidth,
-			                            GraphicsDevice.PresentationParameters.BackBufferHeight);
-
-            GraphicsDevice.Viewport = viewport;
-			Platform.EndScreenDeviceChange(string.Empty, viewport.Width, viewport.Height);
+            // Too many overwrites of the GraphicsDevice.Viewport property, obliterating anything the dev has set in their game code
+            //var viewport = new Viewport(0, 0,
+            //                            GraphicsDevice.PresentationParameters.BackBufferWidth,
+            //                            GraphicsDevice.PresentationParameters.BackBufferHeight);
+            //GraphicsDevice.Viewport = viewport;
+            Platform.EndScreenDeviceChange(
+                string.Empty,
+                GraphicsDevice.PresentationParameters.BackBufferWidth,
+                GraphicsDevice.PresentationParameters.BackBufferHeight);
         }
 
         internal void DoUpdate(GameTime gameTime)
