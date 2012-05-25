@@ -42,6 +42,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Microsoft.Xna.Framework;
 #endregion Using clause
 
 namespace Microsoft.Xna.Framework.Input.Touch
@@ -52,7 +53,11 @@ namespace Microsoft.Xna.Framework.Input.Touch
 		internal static Queue<GestureSample> GestureList = new Queue<GestureSample>();
 		internal static event EventHandler EnabledGesturesChanged;
         internal static TouchPanelCapabilities Capabilities = new TouchPanelCapabilities();
-
+        static float displayWidth;
+        static float displayHeight;
+        static float widthScaler = 1.0f;
+        static float heightScaler = 1.0f;
+        
         public static TouchPanelCapabilities GetCapabilities()
         {
             Capabilities.Initialize();
@@ -79,14 +84,12 @@ namespace Microsoft.Xna.Framework.Input.Touch
         {
             get
             {
-#if ANDROID				
-				return (int)Game.Activity.Resources.DisplayMetrics.HeightPixels;
-#else
-                return Game.Instance.Window.ClientBounds.Height;
-#endif
+                return (int)displayHeight;
             }
             set
             {
+                displayHeight = value;
+                heightScaler = (1.0f / GraphicsDeviceManager.DefaultBackBufferHeight) * displayHeight;
             }
         }
 
@@ -100,14 +103,12 @@ namespace Microsoft.Xna.Framework.Input.Touch
         {
             get
             {
-#if ANDROID				
-				return (int)Game.Activity.Resources.DisplayMetrics.WidthPixels;
-#else
-                return Game.Instance.Window.ClientBounds.Width;
-#endif				
+                return (int)displayWidth;
             }
             set
             {
+                displayWidth = value;
+                widthScaler = (1.0f / GraphicsDeviceManager.DefaultBackBufferWidth) * displayWidth;
             }
         }
 		
@@ -133,6 +134,12 @@ namespace Microsoft.Xna.Framework.Input.Touch
             {
 				return ( GestureList.Count > 0 );				
             }
+        }
+        
+        internal static void ScaleInput(ref Vector2 position)
+        {
+            position.X *= widthScaler;
+            position.Y *= heightScaler;
         }
     }
 }

@@ -556,18 +556,21 @@ namespace Microsoft.Xna.Framework
 
         internal void applyChanges(GraphicsDeviceManager manager)
         {
-			Platform.BeginScreenDeviceChange(GraphicsDevice.PresentationParameters.IsFullScreen);
+            Platform.BeginScreenDeviceChange(GraphicsDevice.PresentationParameters.IsFullScreen);
             if (GraphicsDevice.PresentationParameters.IsFullScreen)
                 Platform.EnterFullScreen();
             else
                 Platform.ExitFullScreen();
 
-            var viewport = new Viewport(0, 0,
-			                            GraphicsDevice.PresentationParameters.BackBufferWidth,
-			                            GraphicsDevice.PresentationParameters.BackBufferHeight);
-
-            GraphicsDevice.Viewport = viewport;
-			Platform.EndScreenDeviceChange(string.Empty, viewport.Width, viewport.Height);
+            // Too many overwrites of the GraphicsDevice.Viewport property, obliterating anything the dev has set in their game code
+            //var viewport = new Viewport(0, 0,
+            //                            GraphicsDevice.PresentationParameters.BackBufferWidth,
+            //                            GraphicsDevice.PresentationParameters.BackBufferHeight);
+            //GraphicsDevice.Viewport = viewport;
+            Platform.EndScreenDeviceChange(
+                string.Empty,
+                GraphicsDevice.PresentationParameters.BackBufferWidth,
+                GraphicsDevice.PresentationParameters.BackBufferHeight);
         }
 
         internal void DoUpdate(GameTime gameTime)

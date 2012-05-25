@@ -59,9 +59,10 @@ namespace Microsoft.Xna.Framework.Input.Touch
 		{
 			get
 			{
-				return this.isConnected;
+				return isConnected;
 			}
 		}
+        
 		public bool IsReadOnly
 		{
 			get
@@ -72,12 +73,21 @@ namespace Microsoft.Xna.Framework.Input.Touch
 		#endregion
 		
 		public TouchCollection()
-		{
+        {
+#if IPHONE || ANDROID
+            isConnected = true;
+#else
+            isConnected = false;
+#endif
 		}
 		
 		internal TouchCollection(IEnumerable<TouchLocation> locations)	: base (locations)
-		{
-			
+        {
+#if IPHONE || ANDROID
+            isConnected = true;
+#else
+            isConnected = false;
+#endif
 		}
 		
 		static TouchLocation t;
@@ -152,21 +162,26 @@ namespace Microsoft.Xna.Framework.Input.Touch
 			return -1;
 		}
 
-		internal void Add(int id, Vector2 position) {
-			for (int i = 0; i < Count; i++) {
-				if (this[i].Id == id) {
+		internal void Add(int id, Vector2 position)
+        {
+            for (int i = 0; i < Count; i++)
+            {
+                if (this[i].Id == id)
+                {
                     Debug.WriteLine("Error: Attempted to re-add the same touch as a press.");
-					Clear ();
-				}
-			}
+                    Clear();
+                }
+            }
+            TouchPanel.ScaleInput(ref position);
 			Add(new TouchLocation(id, TouchLocationState.Pressed, position));
 		}
 
 		internal void Update(int id, TouchLocationState state, Vector2 position)
-		{
-			if (state == TouchLocationState.Pressed)
-				throw new ArgumentException("Argument 'state' cannot be TouchLocationState.Pressed.");
+        {
+            if (state == TouchLocationState.Pressed)
+                throw new ArgumentException("Argument 'state' cannot be TouchLocationState.Pressed.");
 
+            TouchPanel.ScaleInput(ref position);
 			for (int i = 0; i < Count; i++)
 			{
 				if (this[i].Id == id)
