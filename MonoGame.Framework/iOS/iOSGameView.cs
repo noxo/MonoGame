@@ -268,11 +268,8 @@ namespace Microsoft.Xna.Framework {
 
 			if (gds != null && gds.GraphicsDevice != null)
 			{
-                // Too many overwrites of the GraphicsDevice.Viewport property, obliterating anything the dev has set in their game code
-				//gds.GraphicsDevice.Viewport = new Viewport (
-				//	0, 0,
-				//	(int) (unscaledViewportWidth * Layer.ContentsScale),
-				//	(int) (unscaledViewportHeight * Layer.ContentsScale));
+                // Framebuffer was recreated, so reset the GraphicsDevice rather than set properties explicitly
+                gds.GraphicsDevice.Reset();
 				
 				// FIXME: These static methods on GraphicsDevice need
 				//        to go away someday.
