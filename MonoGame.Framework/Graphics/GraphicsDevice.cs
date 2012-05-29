@@ -269,8 +269,7 @@ namespace Microsoft.Xna.Framework.Graphics
         public GraphicsDevice()
         {
             // Initialize the main viewport
-            _viewport = new Viewport(0, 0,
-			                         DisplayMode.Width, DisplayMode.Height);
+            Viewport = new Viewport(0, 0, DisplayMode.Width, DisplayMode.Height);
             _viewport.MaxDepth = 1.0f;
 
             Textures = new TextureCollection(16);
@@ -288,19 +287,23 @@ namespace Microsoft.Xna.Framework.Graphics
             // Setup extensions.
 #if OPENGL
 #if GLES
-			extensions.AddRange(GL.GetString(RenderbufferStorage.Extensions).Split(' '));
+            extensions.AddRange(GL.GetString(RenderbufferStorage.Extensions).Split(' '));
 #else
 			extensions.AddRange(GL.GetString(StringName.Extensions).Split(' '));	
 #endif
 
-			System.Diagnostics.Debug.WriteLine("Supported extensions:");
-			foreach (string extension in extensions)
-				System.Diagnostics.Debug.WriteLine(extension);
+            System.Diagnostics.Debug.WriteLine("Supported extensions:");
+            foreach (string extension in extensions)
+                System.Diagnostics.Debug.WriteLine(extension);
 
 #endif // OPENGL
 
             PresentationParameters.DisplayOrientation = TouchPanel.DisplayOrientation;
-
+            // TouchPanel.DisplayHeight and DisplayWidth are initialized to the display size.
+            // These act as scalers for the physical input.
+            TouchPanel.DisplayWidth = DisplayMode.Width;
+            TouchPanel.DisplayHeight = DisplayMode.Height;
+            
 #if DIRECTX
 
             CreateDeviceIndependentResources();
@@ -312,7 +315,7 @@ namespace Microsoft.Xna.Framework.Graphics
             _graphics = new GraphicsContext();
 #elif OPENGL
 
-            _viewport = new Viewport(0, 0, PresentationParameters.BackBufferWidth, PresentationParameters.BackBufferHeight);
+            Viewport = new Viewport(0, 0, PresentationParameters.BackBufferWidth, PresentationParameters.BackBufferHeight);
             VboIdArray = 0;
             VboIdElement = 0;
 #endif
@@ -656,7 +659,7 @@ namespace Microsoft.Xna.Framework.Graphics
 #else
 			GL.Clear (bufferMask);
 #endif
-#endif // OPENGL
+#endif
         }
 		
         public void Clear(ClearOptions options, Color color, float depth, int stencil, Rectangle[] regions)
@@ -798,8 +801,8 @@ namespace Microsoft.Xna.Framework.Graphics
 
         public void Reset()
         {
-            _viewport.Width = DisplayMode.Width;
-            _viewport.Height = DisplayMode.Height;
+            // Reset the viewport to what it was before the reset
+            Viewport = _viewport;
 
             if (ResourcesLost)
             {

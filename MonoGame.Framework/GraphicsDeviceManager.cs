@@ -205,16 +205,6 @@ namespace Microsoft.Xna.Framework
 
             _graphicsDevice.Initialize();
 
-            // Set the default viewport of the graphics device to the preferred back buffer size
-            // set by the dev in GraphicsDeviceManager in the game ctor.  If the dev did not set these values,
-            // these will default to the display size.
-            _graphicsDevice.Viewport = new Viewport(0, 0, _preferredBackBufferWidth, _preferredBackBufferHeight);
-            
-            // TouchPanel.DisplayHeight and DisplayWidth are initialized to the preferred back buffer size as well.
-            // These act as scalers for the physical input.
-            TouchPanel.DisplayWidth = _preferredBackBufferWidth;
-            TouchPanel.DisplayHeight = _preferredBackBufferHeight;
-            
 #if !PSS
 			if (_preferMultiSampling)
 			{
