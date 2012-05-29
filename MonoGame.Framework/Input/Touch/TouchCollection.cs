@@ -43,174 +43,128 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 #endregion Using clause
 
 namespace Microsoft.Xna.Framework.Input.Touch
-{	
-	public class TouchCollection : List<TouchLocation>
+{
+    public struct TouchCollection : IList<TouchLocation>
 	{
-		/// <summary>
-		/// Attributes 
-		/// </summary>
-		private bool isConnected;
-		
+        private TouchLocation[] _collection;
+
+        private bool _isConnected;
+
 		#region Properties
-		public bool IsConnected
-		{
-			get
-			{
-				return isConnected;
-			}
-		}
-        
-		public bool IsReadOnly
-		{
-			get
-			{
-				return true;
-			}
-		}
+
+		public bool IsConnected { get { return _isConnected; } }
+
 		#endregion
-		
-		public TouchCollection()
-        {
-#if IPHONE || ANDROID
-            isConnected = true;
-#else
-            isConnected = false;
-#endif
-		}
-		
-		internal TouchCollection(IEnumerable<TouchLocation> locations)	: base (locations)
-        {
-#if IPHONE || ANDROID
-            isConnected = true;
-#else
-            isConnected = false;
-#endif
-		}
-		
-		static TouchLocation t;
-		internal void Update()
-		{
-			
-			// First update active touches 
-			for (int i = this.Count - 1; i >= 0; --i)
-			{
-				t = this[i];
-				
-				switch (t.State)
-				{
-					case TouchLocationState.Pressed:
-						t.PrevPosition = t.Position;
-						if (!t.pressedStateProcessed)
-							t.pressedStateProcessed = true;	
-						else
-							t.State = TouchLocationState.Moved;
-					
-						break;
-					
-					case TouchLocationState.Moved:
-						t.PrevState = TouchLocationState.Moved;
-						break;
-					
-					case TouchLocationState.Released:
-					case TouchLocationState.Invalid:
-					if (t.releasedStateProcessed)
-					{
-						RemoveAt(i);
-						continue; // Avoid going out of range by accessing this[i]
-					}
-					else
-						t.releasedStateProcessed = true;
-					
-					break;
-				}
-				
-				this[i] = t;
-			}
-			
-#if IPHONE
-			iOSGameView.UpdateGestures();
-#endif
-		}
 
-		public bool FindById(int id, out TouchLocation touchLocation)
-		{
-			int index = this.FindIndex((t) => { return t.Id == id; });
-			if (index >= 0)
-			{
-				touchLocation = this[index];
-				return true;
-			}
-			touchLocation = default(TouchLocation);
-			return false;
-		}
-
-		internal int FindIndexById(int id, out TouchLocation touchLocation)
-		{
-			for (int i = 0; i < this.Count; i++)
-			{
-				TouchLocation location = this[i];
-				if (location.Id == id)
-				{
-					touchLocation = location;
-					return i;
-				}
-			}
-			touchLocation = default(TouchLocation);
-			return -1;
-		}
-
-		internal void Add(int id, Vector2 position)
+        public TouchCollection(TouchLocation[] touches)
         {
-            for (int i = 0; i < Count; i++)
+            _isConnected = true;
+            _collection = touches;
+        }
+
+        public bool FindById(int id, out TouchLocation touchLocation)
+		{
+            for (var i = 0; i < _collection.Length; i++)
             {
-                if (this[i].Id == id)
+                var location = _collection[i];
+                if (location.Id == id)
                 {
-                    Debug.WriteLine("Error: Attempted to re-add the same touch as a press.");
-                    Clear();
+                    touchLocation = location;
+                    return true;
                 }
             }
-            TouchPanel.ScaleInput(ref position);
-			Add(new TouchLocation(id, TouchLocationState.Pressed, position));
+
+            touchLocation = default(TouchLocation);
+            return false;
 		}
 
-		internal void Update(int id, TouchLocationState state, Vector2 position)
+        #region IList<TouchLocation>
+
+        public bool IsReadOnly
         {
-            if (state == TouchLocationState.Pressed)
-                throw new ArgumentException("Argument 'state' cannot be TouchLocationState.Pressed.");
+            get { return true; }
+        }
 
-            TouchPanel.ScaleInput(ref position);
-			for (int i = 0; i < Count; i++)
-			{
-				if (this[i].Id == id)
-				{				
-					var touchLocation = this[i];
-					touchLocation.Position = position;
-					
-					// Some OS's can give us moved/released updates before we have a chance to process pressed
-					// Give the app a chance to respond to pressed
-					if ( !this[i].pressedStateProcessed )
-					{
-						if (state == TouchLocationState.Moved)
-							return;
-						
-						if (state == TouchLocationState.Invalid || state == TouchLocationState.Released)
-						{
-							RemoveAt(i);
-							return;
-						}
-					}
-					
-					touchLocation.State = state;
-					this[i] = touchLocation;
-					return;
-				}
-			}
+        public int IndexOf(TouchLocation item)
+        {
+            for (var i = 0; i < _collection.Length; i++)
+            {
+                if (item == _collection[i])
+                    return i;
+            }
 
-			Debug.WriteLine("Error: Attempted to mark a non-existent touch {0} as {1}.", id, state);
-			Clear ();
-		}
-	}
+            return -1;
+        }
+
+        public void Insert(int index, TouchLocation item)
+        {
+            throw new NotSupportedException();
+        }
+
+        public void RemoveAt(int index)
+        {
+            throw new NotSupportedException();
+        }
+
+        public TouchLocation this[int index]
+        {
+            get { return _collection[index]; }
+            set
+            {
+                throw new NotSupportedException();
+            }
+        }
+
+        public void Add(TouchLocation item)
+        {
+            throw new NotSupportedException();
+        }
+
+        public void Clear()
+        {
+            throw new NotSupportedException();
+        }
+
+        public bool Contains(TouchLocation item)
+        {
+            for (var i = 0; i < _collection.Length; i++)
+            {
+                if (item == _collection[i])
+                    return true;
+            }
+
+            return false;
+        }
+
+        public void CopyTo(TouchLocation[] array, int arrayIndex)
+        {
+            _collection.CopyTo(array, arrayIndex);
+        }
+
+        public int Count
+        {
+            get { return _collection.Length; }
+        }
+
+        public bool Remove(TouchLocation item)
+        {
+            throw new NotSupportedException();
+        }
+
+        public IEnumerator<TouchLocation> GetEnumerator()
+        {
+            return _collection.AsEnumerable().GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return _collection.GetEnumerator();
+        }
+
+        #endregion // IList<TouchLocation>
+    }
 }
