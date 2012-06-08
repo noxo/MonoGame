@@ -105,6 +105,8 @@ namespace Microsoft.Xna.Framework.Graphics
 
         public SamplerStateCollection SamplerStates { get; private set; }
 
+        private static Color DiscardColor = new Color(68, 34, 136, 255);
+
 #if DIRECTX
 
         // Declare Direct2D Objects
@@ -126,6 +128,12 @@ namespace Microsoft.Xna.Framework.Graphics
         protected SharpDX.Direct3D11.DepthStencilView _depthStencilView;
         protected SharpDX.Direct2D1.Bitmap1 _bitmapTarget;
         protected SharpDX.DXGI.SwapChain1 _swapChain;
+
+        // The active render targets.
+        protected SharpDX.Direct3D11.RenderTargetView[] _currentRenderTargets = new SharpDX.Direct3D11.RenderTargetView[4];
+
+        // The active depth view.
+        protected SharpDX.Direct3D11.DepthStencilView _currentDepthStencilView;
 
         protected float _dpi;
 
@@ -334,7 +342,7 @@ namespace Microsoft.Xna.Framework.Graphics
 #endif
 
             // Set the default render target.
-            SetRenderTarget(null);
+            ApplyRenderTargets(null);
 
             // Set the default scissor rect.
             _scissorRectangleDirty = true;
@@ -476,7 +484,7 @@ namespace Microsoft.Xna.Framework.Graphics
             }
 
             // Obtain the backbuffer for this window which will be the final 3D rendertarget.
-            Windows.Foundation.Size targetSize;
+            Point targetSize;
             using (var backBuffer = SharpDX.Direct3D11.Texture2D.FromSwapChain<SharpDX.Direct3D11.Texture2D>(_swapChain, 0))
             {
                 // Create a view interface on the rendertarget to use on bind.
@@ -484,34 +492,40 @@ namespace Microsoft.Xna.Framework.Graphics
 
                 // Get the rendertarget dimensions for later.
                 var backBufferDesc = backBuffer.Description;
-                targetSize = new Windows.Foundation.Size(backBufferDesc.Width, backBufferDesc.Height);
+                targetSize = new Point(backBufferDesc.Width, backBufferDesc.Height);
             }
 
-            // Create a descriptor for the depth/stencil buffer.
-            // Allocate a 2-D surface as the depth/stencil buffer.
-            // Create a DepthStencil view on this surface to use on bind.
-            using (var depthBuffer = new SharpDX.Direct3D11.Texture2D(_d3dDevice, new SharpDX.Direct3D11.Texture2DDescription()
+            // Create the depth buffer if we need it.
+            if (PresentationParameters.DepthStencilFormat != DepthFormat.None)
             {
-                Format = SharpDX.DXGI.Format.D24_UNorm_S8_UInt,
-                ArraySize = 1,
-                MipLevels = 1,
-                Width = (int)targetSize.Width,
-                Height = (int)targetSize.Height,
-                SampleDescription = multisampleDesc,
-                BindFlags = SharpDX.Direct3D11.BindFlags.DepthStencil,
-            }))
-            
-            _depthStencilView = new SharpDX.Direct3D11.DepthStencilView(_d3dDevice, depthBuffer, 
-                new SharpDX.Direct3D11.DepthStencilViewDescription() 
-                { Dimension = SharpDX.Direct3D11.DepthStencilViewDimension.Texture2D });
+                // Allocate a 2-D surface as the depth/stencil buffer.
+                using (var depthBuffer = new SharpDX.Direct3D11.Texture2D(_d3dDevice, new SharpDX.Direct3D11.Texture2DDescription()
+                {
+                    Format = SharpDXHelper.ToFormat(PresentationParameters.DepthStencilFormat),
+                    ArraySize = 1,
+                    MipLevels = 1,
+                    Width = targetSize.X,
+                    Height = targetSize.Y,
+                    SampleDescription = multisampleDesc,
+                    BindFlags = SharpDX.Direct3D11.BindFlags.DepthStencil,
+                }))
+
+                // Create a DepthStencil view on this surface to use on bind.
+                _depthStencilView = new SharpDX.Direct3D11.DepthStencilView(_d3dDevice, depthBuffer,
+                    new SharpDX.Direct3D11.DepthStencilViewDescription()
+                    {
+                        Format = SharpDXHelper.ToFormat(PresentationParameters.DepthStencilFormat),
+                        Dimension = SharpDX.Direct3D11.DepthStencilViewDimension.Texture2D
+                    });
+            }
 
             // Set the current viewport.
             Viewport = new Viewport
             { 
                 X = 0, 
-                Y = 0, 
-                Width = (int)targetSize.Width, 
-                Height = (int)targetSize.Height, 
+                Y = 0,
+                Width = targetSize.X, 
+                Height = targetSize.Y, 
                 MinDepth = 0.0f, 
                 MaxDepth = 1.0f 
             };
@@ -600,12 +614,24 @@ namespace Microsoft.Xna.Framework.Graphics
         public void Clear(Color color)
         {
 			ClearOptions options = ClearOptions.Target;
-			if (true) { //TODO: Clear only if current backbuffer has a depth component
-				options |= ClearOptions.DepthBuffer;
-			}
-			if (true) { //TODO: Clear only if current backbuffer has a stencil component
-				options |= ClearOptions.Stencil;
-			}
+
+#if DIRECTX
+
+            if (_currentDepthStencilView != null)
+            {
+                options |= ClearOptions.DepthBuffer;
+
+                if (_currentDepthStencilView.Description.Format == SharpDX.DXGI.Format.D24_UNorm_S8_UInt)
+                    options |= ClearOptions.Stencil;
+            }
+
+#else
+            // TODO: We need to figure out how to detect if
+            // we have a depth stencil buffer or not!
+            options |= ClearOptions.DepthBuffer;
+            options |= ClearOptions.Stencil;
+#endif
+
             Clear (options, color.ToVector4(), _viewport.MaxDepth, 0);
         }
 
@@ -619,8 +645,14 @@ namespace Microsoft.Xna.Framework.Graphics
 #if DIRECTX
 
             // Clear the diffuse render buffer.
-            if ((options & ClearOptions.Target) != 0 && _renderTargetView != null)
-                _d3dContext.ClearRenderTargetView(_renderTargetView, new Color4(color.X, color.Y, color.Z, color.W));
+            if ((options & ClearOptions.Target) != 0)
+            {
+                foreach (var view in _currentRenderTargets)
+                {
+                    if ( view != null )
+                        _d3dContext.ClearRenderTargetView(view, new Color4(color.X, color.Y, color.Z, color.W));
+                }
+            }
 
             // Clear the depth/stencil render buffer.
             SharpDX.Direct3D11.DepthStencilClearFlags flags = 0;
@@ -629,8 +661,8 @@ namespace Microsoft.Xna.Framework.Graphics
             if ((options & ClearOptions.Stencil) != 0)
                 flags |= SharpDX.Direct3D11.DepthStencilClearFlags.Stencil;
 
-            if (flags != 0 && _depthStencilView != null)
-                _d3dContext.ClearDepthStencilView(_depthStencilView, flags, depth, (byte)stencil);
+            if (flags != 0 && _currentDepthStencilView != null)
+                _d3dContext.ClearDepthStencilView(_currentDepthStencilView, flags, depth, (byte)stencil);
 
 #elif PSS
 
@@ -945,23 +977,54 @@ namespace Microsoft.Xna.Framework.Graphics
             var previousRenderTargetBindings = _currentRenderTargetBindings;
             _currentRenderTargetBindings = renderTargets;
 		
+            var clearTarget = false;
+
             if (_currentRenderTargetBindings == null || _currentRenderTargetBindings.Length == 0)
 			{
 #if DIRECTX
                 // Set the default swap chain.
-                _d3dContext.OutputMerger.SetTargets(_depthStencilView, _renderTargetView);
+                _currentRenderTargets[0] = _renderTargetView;
+                _currentRenderTargets[1] = null;
+                _currentRenderTargets[2] = null;
+                _currentRenderTargets[3] = null;
+                _currentDepthStencilView = _depthStencilView;
 
+                _d3dContext.OutputMerger.SetTargets(_currentDepthStencilView, _currentRenderTargets);                
 #elif OPENGL
 				GL.BindFramebuffer(GLFramebuffer, 0);
 #endif
+
+                clearTarget = true;
+
                 Viewport = new Viewport(0, 0,
-					this.PresentationParameters.BackBufferWidth, 
-					this.PresentationParameters.BackBufferHeight);
+					PresentationParameters.BackBufferWidth, 
+					PresentationParameters.BackBufferHeight);
 			}
 			else
 			{
+                var renderTarget = _currentRenderTargetBindings[0].RenderTarget as RenderTarget2D;
+
 #if DIRECTX
-                throw new NotImplementedException();
+                // Set the new render targets.
+                _currentRenderTargets[0] = null;
+                _currentRenderTargets[1] = null;
+                _currentRenderTargets[2] = null;
+                _currentRenderTargets[3] = null;
+                _currentDepthStencilView = null;
+
+                for (var b = 0; b < _currentRenderTargetBindings.Length; b++)
+                {
+                    var target = _currentRenderTargetBindings[b]._renderTarget as RenderTarget2D;
+                    _currentRenderTargets[b] = target._renderTargetView;
+
+                    // Use the depth from the first target.
+                    if (b == 0)
+                        _currentDepthStencilView = target._depthStencilView;
+                }
+
+                // Set the targets.
+                _d3dContext.OutputMerger.SetTargets(_currentDepthStencilView, _currentRenderTargets);
+
 #elif OPENGL
 				if (this.glFramebuffer == 0)
 				{
@@ -972,7 +1035,6 @@ namespace Microsoft.Xna.Framework.Graphics
 #endif
 				}
 
-                var renderTarget = _currentRenderTargetBindings[0].RenderTarget as RenderTarget2D;
 				GL.BindFramebuffer(GLFramebuffer, this.glFramebuffer);
 				GL.FramebufferTexture2D(GLFramebuffer, GLColorAttachment0, TextureTarget.Texture2D, renderTarget.glTexture, 0);
 				if (renderTarget.DepthStencilFormat != DepthFormat.None)
@@ -998,10 +1060,20 @@ namespace Microsoft.Xna.Framework.Graphics
 					throw new InvalidOperationException(message);
 				}
                                 
-				this.Viewport = new Viewport(0, 0, renderTarget.Width, renderTarget.Height);
 #endif
+                // Set the viewport to the size of the first render target.
+                Viewport = new Viewport(0, 0, renderTarget.Width, renderTarget.Height);
+
+                // We clear the render target if asked.
+                clearTarget = renderTarget.RenderTargetUsage != RenderTargetUsage.DiscardContents;
             }
-			
+
+            // In XNA 4, because of hardware limitations on Xbox, when
+            // a render target doesn't have PreserveContents as its usage
+            // it is cleared before being rendered to.
+            if (clearTarget)
+                Clear(DiscardColor);
+
 			if (previousRenderTargetBindings != null)
 			{
 				for (var i = 0; i < previousRenderTargetBindings.Length; ++i)
@@ -1026,17 +1098,21 @@ namespace Microsoft.Xna.Framework.Graphics
 #endif
         }
 
-		public RenderTargetBinding[] GetRenderTargets ()
+#if WINRT
+        internal void ResetRenderTargets()
+        {
+            if ( _d3dContext != null )
+                _d3dContext.OutputMerger.SetTargets(_currentDepthStencilView, _currentRenderTargets);                
+        }
+#endif
+
+		public RenderTargetBinding[] GetRenderTargets()
 		{
             if (_currentRenderTargetBindings == null)
                 return EmptyRenderTargetBinding;
 
             return _currentRenderTargetBindings;
 		}
-		
-        public void ResolveBackBuffer(ResolveTexture2D resolveTexture)
-        {
-        }
 
 #if OPENGL
         internal BeginMode PrimitiveTypeGL(PrimitiveType primitiveType)

@@ -154,7 +154,6 @@
     <Compile Include="Graphics\SpriteBlendMode.cs" />
     <Compile Include="Graphics\GraphicsProfile.cs" />
     <Compile Include="Graphics\SpriteSortMode.cs" />
-    <Compile Include="Graphics\ResolveTexture2D.cs" />
     <Compile Include="Graphics\RenderTarget.cs" />
     <Compile Include="Graphics\SurfaceFormat.cs" />
     <Compile Include="Graphics\MultiSampleType.cs" />
@@ -423,12 +422,12 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Graphics\Effect\Resources\AlphaTestEffect.mgfx" />
-    <EmbeddedResource Include="Graphics\Effect\Resources\BasicEffect.mgfx" />
-    <EmbeddedResource Include="Graphics\Effect\Resources\DualTextureEffect.mgfx" />
-    <EmbeddedResource Include="Graphics\Effect\Resources\EnvironmentMapEffect.mgfx" />
-    <EmbeddedResource Include="Graphics\Effect\Resources\SkinnedEffect.mgfx" />
-    <EmbeddedResource Include="Graphics\Effect\Resources\SpriteEffect.mgfx" />
+    <EmbeddedResource Include="Graphics\Effect\Resources\AlphaTestEffect.ogl.mgfxo" />
+    <EmbeddedResource Include="Graphics\Effect\Resources\BasicEffect.ogl.mgfxo" />
+    <EmbeddedResource Include="Graphics\Effect\Resources\DualTextureEffect.ogl.mgfxo" />
+    <EmbeddedResource Include="Graphics\Effect\Resources\EnvironmentMapEffect.ogl.mgfxo" />
+    <EmbeddedResource Include="Graphics\Effect\Resources\SkinnedEffect.ogl.mgfxo" />
+    <EmbeddedResource Include="Graphics\Effect\Resources\SpriteEffect.ogl.mgfxo" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ThirdParty\Lidgren.Network\Lidgren.Network.MacOS.csproj">
