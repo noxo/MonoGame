@@ -268,10 +268,6 @@ namespace Microsoft.Xna.Framework.Graphics
 
         public GraphicsDevice()
         {
-            // Initialize the main viewport
-            Viewport = new Viewport(0, 0, DisplayMode.Width, DisplayMode.Height);
-            _viewport.MaxDepth = 1.0f;
-
             Textures = new TextureCollection(16);
             SamplerStates = new SamplerStateCollection(16);
 
@@ -319,6 +315,10 @@ namespace Microsoft.Xna.Framework.Graphics
             VboIdArray = 0;
             VboIdElement = 0;
 #endif
+            // Initialize the main viewport
+            // DirectX requires this to be set after CreateDeviceResources
+            Viewport = new Viewport(0, 0, DisplayMode.Width, DisplayMode.Height);
+            _viewport.MaxDepth = 1.0f;
 
             // Force set the default render states.
             _blendStateDirty = _depthStencilStateDirty = _rasterizerStateDirty = true;
