@@ -87,7 +87,9 @@ namespace Microsoft.Xna.Framework {
 			void GetInteger (All name, ref int value);
 			void Scissor (int x, int y, int width, int height);
 			void Viewport (int x, int y, int width, int height);
-		}
+            int MajorVersion { get; }
+            int MinorVersion { get; }
+        }
 
 		private class Gles11Api : IOpenGLApi {
 			public All CheckFramebufferStatus (All target)
@@ -146,7 +148,10 @@ namespace Microsoft.Xna.Framework {
 			{
 				GLES11.Viewport (x, y, width, height);
 			}
-		}
+            
+            public int MajorVersion { get { return 1; } }
+            public int MinorVersion { get { return 1; } }
+        }
 
 		private class Gles20Api : IOpenGLApi {
 			public All CheckFramebufferStatus (All target)
@@ -204,6 +209,9 @@ namespace Microsoft.Xna.Framework {
 			{
 				GLES20.Viewport (x, y, width, height);
 			}
+            
+            public int MajorVersion { get { return 2; } }
+            public int MinorVersion { get { return 0; } }
 		}
 	}
 }

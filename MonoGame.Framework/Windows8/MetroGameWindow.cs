@@ -38,27 +38,31 @@ purpose and non-infringement.
 */
 #endregion License
 
-#region Using Statements
 using System;
 using System.ComponentModel;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Reflection;
+using System.Runtime.InteropServices;
+
+using Windows.UI.Core;
+using Windows.Graphics.Display;
+
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using Windows.UI.Core;
-using System.Runtime.InteropServices;
-using Windows.Graphics.Display;
-#endregion Using Statements
+using Windows.UI.ViewManagement;
+
 
 namespace Microsoft.Xna.Framework
 {
     public partial class MetroGameWindow : GameWindow
     {
+        private DisplayOrientation _orientation;
         private CoreWindow _coreWindow;
         protected Game game;
         private readonly List<Keys> _keys;
         private Rectangle _clientBounds;
+        private ApplicationViewState _currentViewState;
 
         #region Internal Properties
 
@@ -87,12 +91,37 @@ namespace Microsoft.Xna.Framework
 
         public override DisplayOrientation CurrentOrientation
         {
-            get { return DisplayOrientation.LandscapeLeft; }
+            get { return _orientation; }
         }
+
+        private MetroGamePlatform Platform { get { return Game.Instance.Platform as MetroGamePlatform; } }
 
         protected internal override void SetSupportedOrientations(DisplayOrientation orientations)
         {
-            // Do nothing.  Desktop platforms don't do orientation.
+            var supported = DisplayOrientations.None;
+
+            if (orientations == DisplayOrientation.Default)
+            {
+                // Make the decision based on the preferred backbuffer dimensions.
+                var manager = Game.graphicsDeviceManager;
+                if (manager.PreferredBackBufferWidth > manager.PreferredBackBufferHeight)
+                    supported = DisplayOrientations.Landscape | DisplayOrientations.LandscapeFlipped;
+                else
+                    supported = DisplayOrientations.Portrait | DisplayOrientations.PortraitFlipped;                    
+            }
+            else
+            {
+                if ((orientations & DisplayOrientation.LandscapeLeft) != 0)
+                    supported |= DisplayOrientations.Landscape;
+                if ((orientations & DisplayOrientation.LandscapeRight) != 0)
+                    supported |= DisplayOrientations.LandscapeFlipped;
+                if ((orientations & DisplayOrientation.Portrait) != 0)
+                    supported |= DisplayOrientations.Portrait;
+                if ((orientations & DisplayOrientation.PortraitUpsideDown) != 0)
+                    supported |= DisplayOrientations.PortraitFlipped;
+            }
+
+            DisplayProperties.AutoRotationPreferences = supported;
         }
 
         #endregion
@@ -113,17 +142,27 @@ namespace Microsoft.Xna.Framework
 
         #region Delegates
 
-        /*
-        private void OpenTkGameWindow_Closing(object sender, CancelEventArgs e)
+        private static Keys KeyTranslate(Windows.System.VirtualKey inkey)
         {
-            Game.Exit();
+            switch (inkey)
+            {
+                // XNA does not have have 'handless' key values.
+                // So, we arebitrarily map those to the 'Left' version.                 
+                case Windows.System.VirtualKey.Control:
+                    return Keys.LeftControl;
+                case Windows.System.VirtualKey.Shift:
+                    return Keys.LeftShift;
+                // Note that the Alt key is now refered to as Menu.
+                case Windows.System.VirtualKey.Menu:
+                    return Keys.LeftAlt;
+                default:                    
+                    return (Keys)inkey;
+            }
         }
-        */
 
         private void Keyboard_KeyUp(CoreWindow sender, KeyEventArgs args)
         {
-            // VirtualKey maps pretty much to XNA keys.
-            var xnaKey = (Keys)args.VirtualKey;
+            var xnaKey = KeyTranslate(args.VirtualKey);
 
             if (_keys.Contains(xnaKey))
                 _keys.Remove(xnaKey);
@@ -131,8 +170,7 @@ namespace Microsoft.Xna.Framework
 
         private void Keyboard_KeyDown(CoreWindow sender, KeyEventArgs args)
         {
-            // VirtualKey maps directly to XNA keys.
-            var xnaKey = (Keys)args.VirtualKey;
+            var xnaKey = KeyTranslate(args.VirtualKey);
 
             if (!_keys.Contains(xnaKey))
                 _keys.Add(xnaKey);
@@ -140,40 +178,53 @@ namespace Microsoft.Xna.Framework
 
         #endregion
 
-        private void HandleInput()
-        {
-            // mouse doesn't need to be treated here, Mouse class does it alone
-
-            // keyboard
-            Keyboard.State = new KeyboardState(_keys.ToArray());
-        }
-
         #endregion
 
         public void Initialize(CoreWindow coreWindow)
         {
             _coreWindow = coreWindow;
 
+            _orientation = ToOrientation(DisplayProperties.CurrentOrientation);
+            DisplayProperties.OrientationChanged += DisplayProperties_OrientationChanged;
+
             _coreWindow.SizeChanged += Window_SizeChanged;
             _coreWindow.Closed += Window_Closed;
 
-            //window.Closing += new EventHandler<CancelEventArgs>(OpenTkGameWindow_Closing);
-            //window.Resize += OnResize;
             _coreWindow.KeyDown += Keyboard_KeyDown;
             _coreWindow.KeyUp += Keyboard_KeyUp;
+
+            _coreWindow.Activated += Window_FocusChanged;
+
+            // TODO: Fix for latest WinSDK changes.
+            //ApplicationView.Value.ViewStateChanged += Application_ViewStateChanged;
+
+            _currentViewState = ApplicationView.Value;
 
             var bounds = _coreWindow.Bounds;
             SetClientBounds(bounds.Width, bounds.Height);
 
-            // Set the window icon.
-            //window.Icon = Icon.ExtractAssociatedIcon(Assembly.GetEntryAssembly().Location);
-
             InitializeTouch();
+        }
+
+        /*
+        private void Application_ViewStateChanged(ApplicationView sender, ApplicationViewStateChangedEventArgs args)
+        {
+            // TODO: We may want to expose this event via GameWindow
+            // only in WinRT builds....  not sure yet.
+        }
+        */
+
+        private void Window_FocusChanged(CoreWindow sender, WindowActivatedEventArgs args)
+        {
+            if (args.WindowActivationState == CoreWindowActivationState.Deactivated)
+                Platform.IsActive = false;
+            else
+                Platform.IsActive = true;
         }
 
         private void Window_Closed(CoreWindow sender, CoreWindowEventArgs args)
         {
-            throw new NotImplementedException();
+            Game.Exit();
         }
 
         private void SetClientBounds(double width, double height)
@@ -188,12 +239,102 @@ namespace Microsoft.Xna.Framework
         private void Window_SizeChanged(CoreWindow sender, WindowSizeChangedEventArgs args)
         {
             SetClientBounds( args.Size.Width, args.Size.Height );
+
+            // If we have a valid client bounds then update the graphics device.
+            if (_clientBounds.Width > 0 && _clientBounds.Height > 0)
+                UpdateGraphicsDevice();
+
+            OnClientSizeChanged();
+
+            Platform.ViewState = ApplicationView.Value;
+        }
+
+
+        private static DisplayOrientation ToOrientation(DisplayOrientations orientation)
+        {
+            DisplayOrientation result = (DisplayOrientation)0;
+
+            if (DisplayProperties.NativeOrientation == orientation)
+                result |= DisplayOrientation.Default;
+
+            switch (orientation)
+            {
+                default:
+                case DisplayOrientations.None:
+                    result |= DisplayOrientation.Default;
+                    break;
+
+                case DisplayOrientations.Landscape:
+                    result |= DisplayOrientation.LandscapeLeft;
+                    break;
+
+                case DisplayOrientations.LandscapeFlipped:
+                    result |= DisplayOrientation.LandscapeRight;
+                    break;
+
+                case DisplayOrientations.Portrait:
+                    result |= DisplayOrientation.Portrait;
+                    break;
+
+                case DisplayOrientations.PortraitFlipped:
+                    result |= DisplayOrientation.PortraitUpsideDown;
+                    break;
+            }
+
+            return result;
+        }
+
+        private void DisplayProperties_OrientationChanged(object sender)
+        {
+            // Set the new orientation.
+            _orientation = ToOrientation(DisplayProperties.CurrentOrientation);
+
+            // If we have a valid client bounds then update the graphics device.
+            if (_clientBounds.Width > 0 && _clientBounds.Height > 0)
+                UpdateGraphicsDevice();
+
+            // Call the user callback.
+            OnOrientationChanged();
+        }
+
+        private void UpdateGraphicsDevice()
+        {
+            // Is the orientation landscape and is landscape the default?
+            var isLandscape = (_orientation & (DisplayOrientation.LandscapeLeft | DisplayOrientation.LandscapeRight)) != 0;
+            var isDefaultLandscape = DisplayProperties.NativeOrientation == DisplayOrientations.Landscape;
+
+            // Get the new width and height considering that the 
+            // orientation changes how we read the client bounds.
+            // 
+            // TODO: Is the Win8 Simulator broken or is this really correct?
+            //
+            int newWidth, newHeight;
+            if (true) //isLandscape == isDefaultLandscape)
+            {
+                newWidth = _clientBounds.Width;
+                newHeight = _clientBounds.Height;
+            }
+            else
+            {
+                newWidth = _clientBounds.Height;
+                newHeight = _clientBounds.Width;
+            }
+
+            // Update the graphics device.
+            var device = Game.GraphicsDevice;
+            device.Viewport = new Viewport(0, 0, newWidth, newHeight);
+            device.PresentationParameters.BackBufferWidth = newWidth;
+            device.PresentationParameters.BackBufferHeight = newHeight;
+            device.CreateSizeDependentResources();
+            device.ApplyRenderTargets(null);
+
             OnClientSizeChanged();
         }
 
         protected override void SetTitle(string title)
         {
-            //window.Title = title;
+            // NOTE: There seems to be no concept of a
+            // window title in a Metro application.
         }
 
         internal void SetCursor(bool visible)
@@ -217,12 +358,13 @@ namespace Microsoft.Xna.Framework
                 // Process events incoming to the window.
                 _coreWindow.Dispatcher.ProcessEvents(CoreProcessEventsOption.ProcessAllIfPresent);
 
-                // Process the game.
+                // Apply the keyboard state gathered from
+                // the key events since the last tick.
+                Keyboard.State = new KeyboardState(_keys.ToArray());
+
+                // Update and render the game.
                 if (Game != null)
-                {
-                    HandleInput();
                     Game.Tick();
-                }
 
                 if (IsExiting)
                     break;
@@ -246,6 +388,16 @@ namespace Microsoft.Xna.Framework
         }
 
         #endregion
+    }
+
+    public class ViewStateChangedEventArgs : EventArgs
+    {
+        public readonly ApplicationViewState ViewState;
+
+        public ViewStateChangedEventArgs(ApplicationViewState newViewstate)
+        {
+            ViewState = newViewstate;
+        }
     }
 }
 

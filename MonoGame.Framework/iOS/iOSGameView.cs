@@ -64,6 +64,9 @@ change. To the extent permitted under your local laws, the contributors exclude
 the implied warranties of merchantability, fitness for a particular purpose and
 non-infringement.
 */
+using OpenTK;
+
+
 #endregion License
 
 using System;
@@ -149,43 +152,63 @@ namespace Microsoft.Xna.Framework {
 		//        Some level of cooperation with the UIView/Layer will
 		//        probably always be necessary, unfortunately.
 		private GraphicsContext __renderbuffergraphicsContext;
+        private GraphicsContext backgroundContext;
 		private IOpenGLApi _glapi;
-		private void CreateContext ()
-		{
-			AssertNotDisposed ();
+		private void CreateContext()
+        {            
+            AssertNotDisposed();
 
-			Layer.DrawableProperties = NSDictionary.FromObjectsAndKeys (
+            Layer.DrawableProperties = NSDictionary.FromObjectsAndKeys(
 				new NSObject [] {
-					NSNumber.FromBoolean (true),
+					NSNumber.FromBoolean(true),
 					EAGLColorFormat.RGBA8
 				},
 				new NSObject [] {
 					EAGLDrawableProperty.RetainedBacking,
 					EAGLDrawableProperty.ColorFormat
-				});
+				}
+            );
 
-			Layer.ContentsScale = Window.Screen.Scale;
+            Layer.ContentsScale = Window.Screen.Scale;
 
-			//var strVersion = OpenTK.Graphics.ES11.GL.GetString (OpenTK.Graphics.ES11.All.Version);
-			//strVersion = OpenTK.Graphics.ES20.GL.GetString (OpenTK.Graphics.ES20.All.Version);
-			//var version = Version.Parse (strVersion);
+            //var strVersion = OpenTK.Graphics.ES11.GL.GetString (OpenTK.Graphics.ES11.All.Version);
+            //strVersion = OpenTK.Graphics.ES20.GL.GetString (OpenTK.Graphics.ES20.All.Version);
+            //var version = Version.Parse (strVersion);
 
-			try {
-				__renderbuffergraphicsContext = new GraphicsContext (null, null, 2, 0, GraphicsContextFlags.Embedded);
-				_glapi = new Gles20Api ();
-			} catch {
-				__renderbuffergraphicsContext = new GraphicsContext (null, null, 1, 1, GraphicsContextFlags.Embedded);
-				_glapi = new Gles11Api ();
-			}
+            GraphicsContext.ShareContexts = true;
+            try
+            {
+                __renderbuffergraphicsContext = new GraphicsContext(null, null, 2, 0, GraphicsContextFlags.Embedded);
+                _glapi = new Gles20Api();
+            }
+            catch
+            {
+                __renderbuffergraphicsContext = new GraphicsContext(null, null, 1, 1, GraphicsContextFlags.Embedded);
+                _glapi = new Gles11Api();
+            }
 
-			__renderbuffergraphicsContext.MakeCurrent (null);
+            __renderbuffergraphicsContext.MakeCurrent(null);
+            
+            // Create background context for multithreaded asset loading
+            backgroundContext = new GraphicsContext(
+                null,
+                null,
+                _glapi.MajorVersion,
+                _glapi.MinorVersion,
+                GraphicsContextFlags.Embedded
+            );
+            Threading.BackgroundContext = backgroundContext;
 		}
 
-		private void DestroyContext ()
-		{
-			AssertNotDisposed ();
-			AssertValidContext ();
+		private void DestroyContext()
+        {
+            AssertNotDisposed();
+            AssertValidContext();
 
+            Threading.BackgroundContext = null;
+            backgroundContext.Dispose();
+            backgroundContext = null;
+            
 			__renderbuffergraphicsContext.Dispose ();
 			__renderbuffergraphicsContext = null;
 			_glapi = null;
@@ -245,15 +268,16 @@ namespace Microsoft.Xna.Framework {
 
 			if (gds != null && gds.GraphicsDevice != null)
 			{
-				gds.GraphicsDevice.Viewport = new Viewport (
-					0, 0,
-					(int) (unscaledViewportWidth * Layer.ContentsScale),
-					(int) (unscaledViewportHeight * Layer.ContentsScale));
+                // Framebuffer was recreated, so reset the GraphicsDevice rather than set properties explicitly
+                gds.GraphicsDevice.Reset();
 				
 				// FIXME: These static methods on GraphicsDevice need
 				//        to go away someday.
 				gds.GraphicsDevice.glFramebuffer = _framebuffer;
 			}
+
+            if (Threading.BackgroundContext == null)
+                Threading.BackgroundContext = new MonoTouch.OpenGLES.EAGLContext(ctx.EAGLContext.API, ctx.EAGLContext.ShareGroup);
 		}
 
 		private void DestroyFramebuffer ()

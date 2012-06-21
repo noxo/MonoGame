@@ -56,10 +56,6 @@ namespace Microsoft.Xna.Framework
 {
     public class OpenTKGameWindow : GameWindow
     {
-        private GameTime _updateGameTime;
-        private GameTime _drawGameTime;
-        private DateTime _lastUpdate;
-        private DateTime _now;
         private bool _allowUserResizing;
         private DisplayOrientation _currentOrientation;
         private IntPtr _windowHandle = IntPtr.Zero;
@@ -146,8 +142,21 @@ namespace Microsoft.Xna.Framework
 
         private void OnResize(object sender, EventArgs e)
         {
-            //Game.GraphicsDevice.SizeChanged(window.ClientRectangle.Width, window.ClientRectangle.Height);
-            Game.GraphicsDevice.Viewport = new Viewport(0, 0, window.ClientRectangle.Width, window.ClientRectangle.Height);
+            var winWidth = window.ClientRectangle.Width;
+            var winHeight = window.ClientRectangle.Height;
+            var winRect = new Rectangle(0, 0, winWidth, winHeight);
+            
+            // If window size is zero, leave bounds unchanged
+            if (winWidth == 0 || winHeight == 0)
+                return;
+            
+            ChangeClientBounds(winRect);
+            
+            Game.GraphicsDevice.Viewport = new Viewport(0, 0, winWidth, winHeight);
+            
+            Game.GraphicsDevice.PresentationParameters.BackBufferWidth = winWidth;
+            Game.GraphicsDevice.PresentationParameters.BackBufferHeight = winHeight;
+            
             OnClientSizeChanged();
         }
 
@@ -160,6 +169,11 @@ namespace Microsoft.Xna.Framework
             if (!GraphicsContext.CurrentContext.IsCurrent)
                 window.MakeCurrent();
 
+            UpdateWindowState();
+        }
+
+        private void UpdateWindowState()
+        {
             // we should wait until window's not fullscreen to resize
             if (updateClientBounds && window.WindowState == WindowState.Normal)
             {
@@ -167,14 +181,17 @@ namespace Microsoft.Xna.Framework
                                      clientBounds.Y, clientBounds.Width, clientBounds.Height);
 
                 updateClientBounds = false;
+                if (window.WindowState != windowState)
+                    window.WindowState = windowState;
             }
 
-            if (window.WindowState != windowState)
-                window.WindowState = windowState;
+
         }
 
         private void OnUpdateFrame(object sender, FrameEventArgs e)
         {
+            UpdateWindowState();
+
             if (Game != null)
             {
                 HandleInput();
@@ -227,13 +244,6 @@ namespace Microsoft.Xna.Framework
 #else
             Mouse.setWindows(window);
 #endif
-
-            // Initialize GameTime
-            _updateGameTime = new GameTime();
-            _drawGameTime = new GameTime();
-
-            // Initialize _lastUpdate
-            _lastUpdate = DateTime.Now;
 
             //Default no resizing
             AllowUserResizing = false;

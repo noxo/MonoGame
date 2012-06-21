@@ -161,17 +161,7 @@ namespace Microsoft.Xna.Framework
         {
             base.BeforeInitialize ();
             _viewController.View.MakeCurrent ();
-            TouchPanel.Reset();
-
-            // HACK: Because GraphicsDevice doesn't know anything, we need to
-            //       tell it the current viewport size.  Once GraphicsDevice is
-            //       capable of querying PresentationParameters
-            //       DeviceWindowHandle for the size, this will no longer be
-            //       needed.
-            var gds = (IGraphicsDeviceService)Game.Services.GetService(typeof(IGraphicsDeviceService));
-            if (gds != null && gds.GraphicsDevice != null) {
-                gds.GraphicsDevice.Viewport = new Viewport(0, 0, Window.ClientBounds.Width, Window.ClientBounds.Height);
-            }
+            //TouchPanel.Reset();
         }
 
         public override void RunLoop()
@@ -254,6 +244,10 @@ namespace Microsoft.Xna.Framework
         {
             if (IsPlayingVideo)
                 return false;
+
+            // Let the touch panel update states.
+            TouchPanel.UpdateState();
+			
             return true;
         }
 
@@ -321,7 +315,7 @@ namespace Microsoft.Xna.Framework
         private void Application_DidBecomeActive(NSNotification notification)
         {
             IsActive = true;
-            TouchPanel.Reset();
+            //TouchPanel.Reset();
         }
 
         private void Application_WillResignActive(NSNotification notification)

@@ -48,7 +48,12 @@ using OpenTK.Graphics.ES20;
 using Android.Views;
 #endif
 
+#if IPHONE
+using MonoTouch.UIKit;
+#endif
+
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input.Touch;
 
 namespace Microsoft.Xna.Framework
 {
@@ -61,19 +66,57 @@ namespace Microsoft.Xna.Framework
 		private bool _preferMultiSampling;
 		private DisplayOrientation _supportedOrientations;
 		private bool wantFullScreen = true;
-
+        static int defaultBackBufferWidth = 0;
+        static int defaultBackBufferHeight = 0;
+        
+        /// <summary>
+        /// The default width of the back buffer.
+        /// </summary>
+        public static int DefaultBackBufferWidth
+        {
+            get
+            {
+                // This property would normally be a static readonly field, but readonly fields
+                // can only be set during a ctor, and on iOS at least we do not have the screen size
+                // at the time a static ctor would be called. So we make it a static property with a
+                // getter.  This will function the same way unless the static field is accessed before
+                // the GraphicsDeviceManager instance is created.
+                if (defaultBackBufferWidth == 0)
+                    throw new InvalidOperationException("DefaultBackBufferWidth is not available until a GraphicsDeviceManager instance is created.");
+                return defaultBackBufferWidth;
+            }
+        }
+        
+        /// <summary>
+        /// The default height of the back buffer.
+        /// </summary>
+        public static int DefaultBackBufferHeight
+        {
+            get
+            {
+                // This property would normally be a static readonly field, but readonly fields
+                // can only be set during a ctor, and on iOS at least we do not have the screen size
+                // at the time a static ctor would be called. So we make it a static property with a
+                // getter.  This will function the same way unless the static field is accessed before
+                // the GraphicsDeviceManager instance is created.
+                if (defaultBackBufferHeight == 0)
+                    throw new InvalidOperationException("DefaultBackBufferHeight is not available until a GraphicsDeviceManager instance is created.");
+                return defaultBackBufferHeight;
+            }
+        }
+        
         public GraphicsDeviceManager(Game game)
         {
             if (game == null)
             {
-                throw new ArgumentNullException("Game Cannot Be Null");
+                throw new ArgumentNullException("game cannot be null");
             }
             
 			_game = game;
-			
+
 			_supportedOrientations = DisplayOrientation.Default;
-			_preferredBackBufferHeight = game.Window.ClientBounds.Height;
-			_preferredBackBufferWidth = game.Window.ClientBounds.Width;
+			defaultBackBufferHeight = _preferredBackBufferHeight = game.Window.ClientBounds.Height;
+			defaultBackBufferWidth = _preferredBackBufferWidth = game.Window.ClientBounds.Width;
 			
             if (game.Services.GetService(typeof(IGraphicsDeviceManager)) != null)
             {
@@ -156,13 +199,12 @@ namespace Microsoft.Xna.Framework
         }
 
 		private void Initialize()
-		{			
-			// Set "full screen"  as default
-			_graphicsDevice.PresentationParameters.IsFullScreen = true;
-            //TODO: This is here on the Windows version, why is it not on the generic?
-#if PSS
+        {			
+            // Set "full screen"  as default
+            _graphicsDevice.PresentationParameters.IsFullScreen = true;
+
             _graphicsDevice.Initialize();
-#endif
+
 #if !PSS
 			if (_preferMultiSampling)
 			{

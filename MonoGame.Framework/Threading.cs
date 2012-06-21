@@ -44,11 +44,7 @@ using System.Threading;
 #if IPHONE
 using MonoTouch.Foundation;
 using MonoTouch.OpenGLES;
-#if ES11
-using OpenTK.Graphics.ES11;
-#else
-using OpenTK.Graphics.ES20;
-#endif
+using OpenTK.Graphics;
 #endif
 
 namespace Microsoft.Xna.Framework
@@ -60,7 +56,7 @@ namespace Microsoft.Xna.Framework
         static List<Action> actions = new List<Action>();
         static Mutex actionsMutex = new Mutex();
 #elif IPHONE
-        public static EAGLContext BackgroundContext;
+        public static GraphicsContext BackgroundContext;
 #endif
         static Threading()
         {
@@ -90,8 +86,8 @@ namespace Microsoft.Xna.Framework
 #if IPHONE
             lock (BackgroundContext)
             {
-                if (EAGLContext.CurrentContext != BackgroundContext)
-                    EAGLContext.SetCurrentContext(BackgroundContext);
+                if (!BackgroundContext.IsCurrent)
+                    BackgroundContext.MakeCurrent(null);
                 action();
             }
 #else
