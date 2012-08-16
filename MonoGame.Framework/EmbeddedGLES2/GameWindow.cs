@@ -257,7 +257,12 @@ namespace Microsoft.Xna.Framework
 
 		private void Initialize ()
 		{	
-			window = new OpenTK.GameWindow ();
+			window = new OpenTK.GameWindow (640,480,GraphicsMode.Default,"",
+			                                GameWindowFlags.Default,
+			                                DisplayDevice.Default,
+			                                2,0,
+			                                GraphicsContextFlags.Embedded);
+
 			window.RenderFrame += OnRenderFrame;
 			window.UpdateFrame += OnUpdateFrame;
 			window.Closing += new EventHandler<CancelEventArgs> (OpenTkGameWindow_Closing);
